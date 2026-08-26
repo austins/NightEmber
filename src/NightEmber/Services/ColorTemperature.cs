@@ -21,13 +21,13 @@ internal static class ColorTemperature
     private const int RedPowerOffset = 60;
     private const double RedPowerExponent = -0.1332047592;
     private const double GreenLogCoefficient = 99.4708025861;
-    private const double GreenLogOffset = -161.1195681661;
+    private const double GreenLogAdjustment = 161.1195681661;
     private const double GreenPowerCoefficient = 288.1221695283;
     private const int GreenPowerOffset = 60;
     private const double GreenPowerExponent = -0.0755148492;
     private const double BlueLogCoefficient = 138.5177312231;
     private const int BlueLogOffset = 10;
-    private const double BlueLogAdjustment = -305.0447927307;
+    private const double BlueLogAdjustment = 305.0447927307;
 
     /// <summary>
     /// Converts a color temperature to gamma-ramp channel multipliers.
@@ -49,12 +49,12 @@ internal static class ColorTemperature
             : RedPowerCoefficient * Math.Pow(temperature - RedPowerOffset, RedPowerExponent);
 
         var green = temperature <= RedGreenThreshold
-            ? GreenLogCoefficient * Math.Log(temperature) + GreenLogOffset
+            ? GreenLogCoefficient * Math.Log(temperature) - GreenLogAdjustment
             : GreenPowerCoefficient * Math.Pow(temperature - GreenPowerOffset, GreenPowerExponent);
 
         var blue = temperature >= RedGreenThreshold ? MaximumChannelValue :
             temperature <= BlueThreshold ? 0 :
-            BlueLogCoefficient * Math.Log(temperature - BlueLogOffset) + BlueLogAdjustment;
+            BlueLogCoefficient * Math.Log(temperature - BlueLogOffset) - BlueLogAdjustment;
 
         return new RgbMultipliers(
             Math.Clamp(red, 0, MaximumChannelValue) / MaximumChannelValue,

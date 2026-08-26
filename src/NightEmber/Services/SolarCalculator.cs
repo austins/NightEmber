@@ -30,7 +30,7 @@ internal static class SolarCalculator
     // sunrise/sunset algorithm, as transcribed at:
     // https://edwilliams.org/sunrise_sunset_algorithm.htm
     private const double MeanAnomalyRate = 0.9856;
-    private const double MeanAnomalyOffset = -3.289;
+    private const double MeanAnomalyAdjustment = 3.289;
     private const double LongitudePrimaryCorrection = 1.916;
     private const double LongitudeSecondaryCorrection = 0.020;
     private const double LongitudeOffset = 282.634;
@@ -156,7 +156,7 @@ internal static class SolarCalculator
 
         var longitudeHour = location.Longitude / DegreesPerHour;
         var approximateDay = date.DayOfYear + (baseHour - longitudeHour) / HoursPerDay;
-        var meanAnomaly = MeanAnomalyRate * approximateDay + MeanAnomalyOffset;
+        var meanAnomaly = MeanAnomalyRate * approximateDay - MeanAnomalyAdjustment;
 
         var trueLongitude = meanAnomaly
                             + LongitudePrimaryCorrection * Math.Sin(radians * meanAnomaly)
