@@ -8,7 +8,7 @@
         <AssemblyTitle>Night Ember</AssemblyTitle>
         <Product>Night Ember</Product>
         <Copyright>Austin S.</Copyright>
-        <Description>A lightweight, portable night-light application for Windows.</Description>
+        <Description>A portable night-light application for Windows.</Description>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
     </PropertyGroup>
