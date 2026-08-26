@@ -7,6 +7,13 @@ namespace NightEmber.Services;
 /// </summary>
 internal sealed class GammaService : IDisposable
 {
+    private const int PercentageScale = 100;
+    private const int RampMidpointIndex = GammaRampBuilder.RampLength / 2;
+
+    // Driver rounding can alter ramp values slightly; a reset changes the midpoint
+    // by thousands, so one 8-bit step is a conservative drift threshold.
+    private const int DriftTolerance = 256;
+
     private readonly List<DisplayContext> _displays = [];
     private ushort? _expectedBlue;
     private double _lastKelvin = ColorTemperature.NeutralKelvin;
@@ -74,7 +81,7 @@ internal sealed class GammaService : IDisposable
         EnsureDisplays();
 
         var rgb = ColorTemperature.ToRgb(kelvin);
-        var brightness = Math.Clamp(brightnessPercent / 100.0, 0.5, 1.0);
+        var brightness = Math.Clamp(brightnessPercent / PercentageScale, GammaRampBuilder.DriverMinimumMultiplier, 1.0);
         var ramp = GammaRampBuilder.Build(rgb.Red, rgb.Green, rgb.Blue, brightness, true);
 
         if (ApplyToAll(ramp))
@@ -135,7 +142,7 @@ internal sealed class GammaService : IDisposable
                 continue;
             }
 
-            var actualBlue = readback[2 * GammaRampBuilder.RampLength + 128];
+            var actualBlue = readback[2 * GammaRampBuilder.RampLength + RampMidpointIndex];
             if (HasDrifted(_expectedBlue.Value, actualBlue))
             {
                 Apply(_lastKelvin, _lastBrightness);
@@ -178,7 +185,7 @@ internal sealed class GammaService : IDisposable
 
     public static bool HasDrifted(ushort expected, ushort actual)
     {
-        return Math.Abs(actual - expected) > 256;
+        return Math.Abs(actual - expected) > DriftTolerance;
     }
 
     private void EnsureDisplays()
@@ -208,7 +215,7 @@ internal sealed class GammaService : IDisposable
 
     private void RememberRamp(ushort[] ramp, double kelvin, double brightnessPercent)
     {
-        _expectedBlue = ramp[2 * GammaRampBuilder.RampLength + 128];
+        _expectedBlue = ramp[2 * GammaRampBuilder.RampLength + RampMidpointIndex];
         _lastKelvin = kelvin;
         _lastBrightness = brightnessPercent;
     }

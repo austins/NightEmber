@@ -5,7 +5,7 @@ namespace NightEmber.Services;
 
 internal static partial class NativeMethods
 {
-    private const int GammaRampElementCount = 256 * 3;
+    private const int GammaRampElementCount = GammaRampBuilder.RampLength * GammaRampBuilder.ChannelCount;
 
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     [LibraryImport(

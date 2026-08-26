@@ -15,7 +15,29 @@ namespace NightEmber.Services;
 /// </remarks>
 internal static class SolarCalculator
 {
+    // Official sunrise/sunset zenith: 90 degrees plus atmospheric refraction
+    // and the apparent radius of the sun near the horizon.
     private const double Zenith = 90.833;
+    private const int DegreesPerHour = 15;
+    private const int HoursPerDay = 24;
+    private const int DegreesPerCircle = 360;
+    private const int MaximumLongitudeDegrees = DegreesPerCircle / 2;
+    private const int DegreesPerQuadrant = 90;
+    private const int SunriseBaseHour = 6;
+    private const int SunsetBaseHour = 18;
+
+    // Coefficients from the U.S. Naval Observatory's Almanac for Computers
+    // sunrise/sunset algorithm, as transcribed at:
+    // https://edwilliams.org/sunrise_sunset_algorithm.htm
+    private const double MeanAnomalyRate = 0.9856;
+    private const double MeanAnomalyOffset = -3.289;
+    private const double LongitudePrimaryCorrection = 1.916;
+    private const double LongitudeSecondaryCorrection = 0.020;
+    private const double LongitudeOffset = 282.634;
+    private const double RightAscensionFactor = 0.91764;
+    private const double DeclinationFactor = 0.39782;
+    private const double LocalMeanTimeRate = 0.06571;
+    private const double LocalMeanTimeOffset = 6.622;
 
     private static readonly IReadOnlyDictionary<string, double> TimeZoneLatitudes =
         new Dictionary<string, double>(StringComparer.Ordinal)
@@ -103,16 +125,22 @@ internal static class SolarCalculator
 
     public static SunTimes GetSunTimes(SolarLocation location, DateTime date, TimeZoneInfo timeZone)
     {
-        var sunrise = GetTime(location, date, 6, true, timeZone);
-        var sunset = GetTime(location, date, 18, false, timeZone);
+        var sunrise = GetTime(location, date, SunriseBaseHour, true, timeZone);
+        var sunset = GetTime(location, date, SunsetBaseHour, false, timeZone);
+
         return new SunTimes(sunrise, sunset);
     }
 
     public static SolarLocation GetTimeZoneLocation(TimeZoneInfo timeZone)
     {
-        var longitude = Math.Clamp(timeZone.BaseUtcOffset.TotalHours * 15.0, -180, 180);
+        var longitude = Math.Clamp(
+            timeZone.BaseUtcOffset.TotalHours * DegreesPerHour,
+            -MaximumLongitudeDegrees,
+            MaximumLongitudeDegrees);
+
         var hasRepresentativeLatitude = TimeZoneLatitudes.TryGetValue(timeZone.Id, out var latitude);
         var source = hasRepresentativeLatitude ? timeZone.Id : $"{timeZone.Id} (equatorial estimate)";
+
         return new SolarLocation(latitude, longitude, source);
     }
 
@@ -126,23 +154,26 @@ internal static class SolarCalculator
         const double radians = Math.PI / 180.0;
         const double degrees = 180.0 / Math.PI;
 
-        var longitudeHour = location.Longitude / 15.0;
-        var approximateDay = date.DayOfYear + (baseHour - longitudeHour) / 24.0;
-        var meanAnomaly = 0.9856 * approximateDay - 3.289;
+        var longitudeHour = location.Longitude / DegreesPerHour;
+        var approximateDay = date.DayOfYear + (baseHour - longitudeHour) / HoursPerDay;
+        var meanAnomaly = MeanAnomalyRate * approximateDay + MeanAnomalyOffset;
+
         var trueLongitude = meanAnomaly
-                            + 1.916 * Math.Sin(radians * meanAnomaly)
-                            + 0.020 * Math.Sin(radians * 2 * meanAnomaly)
-                            + 282.634;
-        trueLongitude = Normalize(trueLongitude, 360);
+                            + LongitudePrimaryCorrection * Math.Sin(radians * meanAnomaly)
+                            + LongitudeSecondaryCorrection * Math.Sin(radians * 2 * meanAnomaly)
+                            + LongitudeOffset;
 
-        var rightAscension = degrees * Math.Atan(0.91764 * Math.Tan(radians * trueLongitude));
-        rightAscension = Normalize(rightAscension, 360);
-        var longitudeQuadrant = Math.Floor(trueLongitude / 90.0) * 90.0;
-        var rightAscensionQuadrant = Math.Floor(rightAscension / 90.0) * 90.0;
-        rightAscension = (rightAscension + longitudeQuadrant - rightAscensionQuadrant) / 15.0;
+        trueLongitude = Normalize(trueLongitude, DegreesPerCircle);
 
-        var sinDeclination = 0.39782 * Math.Sin(radians * trueLongitude);
+        var rightAscension = degrees * Math.Atan(RightAscensionFactor * Math.Tan(radians * trueLongitude));
+        rightAscension = Normalize(rightAscension, DegreesPerCircle);
+        var longitudeQuadrant = Math.Floor(trueLongitude / DegreesPerQuadrant) * DegreesPerQuadrant;
+        var rightAscensionQuadrant = Math.Floor(rightAscension / DegreesPerQuadrant) * DegreesPerQuadrant;
+        rightAscension = (rightAscension + longitudeQuadrant - rightAscensionQuadrant) / DegreesPerHour;
+
+        var sinDeclination = DeclinationFactor * Math.Sin(radians * trueLongitude);
         var cosDeclination = Math.Cos(Math.Asin(sinDeclination));
+
         var cosHourAngle = (Math.Cos(radians * Zenith) - sinDeclination * Math.Sin(radians * location.Latitude))
                            / (cosDeclination * Math.Cos(radians * location.Latitude));
 
@@ -151,11 +182,14 @@ internal static class SolarCalculator
             return null;
         }
 
-        var hourAngle = rising ? 360 - degrees * Math.Acos(cosHourAngle) : degrees * Math.Acos(cosHourAngle);
-        hourAngle /= 15.0;
+        var hourAngle = rising
+            ? DegreesPerCircle - degrees * Math.Acos(cosHourAngle)
+            : degrees * Math.Acos(cosHourAngle);
 
-        var localMeanTime = hourAngle + rightAscension - 0.06571 * approximateDay - 6.622;
-        var universalTime = Normalize(localMeanTime - longitudeHour, 24);
+        hourAngle /= DegreesPerHour;
+
+        var localMeanTime = hourAngle + rightAscension - LocalMeanTimeRate * approximateDay - LocalMeanTimeOffset;
+        var universalTime = Normalize(localMeanTime - longitudeHour, HoursPerDay);
         var utcDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
         var local = TimeZoneInfo.ConvertTimeFromUtc(utcDate.AddHours(universalTime), timeZone);
 

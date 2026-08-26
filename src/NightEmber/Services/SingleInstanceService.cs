@@ -7,6 +7,8 @@ internal sealed class SingleInstanceService : IDisposable
 {
     private const string MutexName = @"Local\NightEmber.Application";
     private const string ActivationEventName = @"Local\NightEmber.Activate";
+    private const int ActivationRetryCount = 10;
+    private const int ActivationRetryDelayMilliseconds = 100;
 
     private readonly Mutex _mutex = new(false, MutexName);
     private readonly EventWaitHandle? _activationEvent;
@@ -74,7 +76,7 @@ internal sealed class SingleInstanceService : IDisposable
     /// </remarks>
     public static void SignalPrimaryInstance()
     {
-        for (var attempt = 0; attempt < 10; attempt++)
+        for (var attempt = 0; attempt < ActivationRetryCount; attempt++)
         {
             try
             {
@@ -84,7 +86,7 @@ internal sealed class SingleInstanceService : IDisposable
             }
             catch (WaitHandleCannotBeOpenedException)
             {
-                Thread.Sleep(100);
+                Thread.Sleep(ActivationRetryDelayMilliseconds);
             }
         }
     }

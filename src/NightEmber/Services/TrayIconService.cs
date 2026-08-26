@@ -5,6 +5,8 @@ namespace NightEmber.Services;
 /// </summary>
 internal sealed class TrayIconService : IDisposable
 {
+    private const int ErrorBalloonDurationMilliseconds = 5000;
+
     private readonly NotifyIcon _notifyIcon;
     private readonly ToolStripMenuItem _toggleItem;
     private readonly ToolStripMenuItem _settingsItem;
@@ -101,7 +103,7 @@ internal sealed class TrayIconService : IDisposable
     public void ShowError(string message)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        _notifyIcon.ShowBalloonTip(5000, "Night Ember", message, ToolTipIcon.Error);
+        _notifyIcon.ShowBalloonTip(ErrorBalloonDurationMilliseconds, "Night Ember", message, ToolTipIcon.Error);
     }
 
     /// <summary>

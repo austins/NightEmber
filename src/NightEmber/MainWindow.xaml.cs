@@ -11,6 +11,12 @@ namespace NightEmber;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    private const int MinimumStrength = 0;
+    private const int MaximumStrength = 100;
+
+    private const double KelvinPerStrengthPoint =
+        (AppSettings.MaximumTemperature - AppSettings.MinimumTemperature) / (double)MaximumStrength;
+
     private readonly bool _initialized;
     private readonly AppController _controller;
     private int _originalTemperature;
@@ -34,12 +40,14 @@ public sealed partial class MainWindow : Window
 
     internal static int TemperatureToStrength(int temperature)
     {
-        return (int)Math.Round((AppSettings.MaximumTemperature - temperature) / 53.0);
+        return (int)Math.Round((AppSettings.MaximumTemperature - temperature) / KelvinPerStrengthPoint);
     }
 
     internal static int StrengthToTemperature(int strength)
     {
-        return (int)Math.Round(AppSettings.MaximumTemperature - Math.Clamp(strength, 0, 100) * 53.0);
+        return (int)Math.Round(
+            AppSettings.MaximumTemperature
+            - Math.Clamp(strength, MinimumStrength, MaximumStrength) * KelvinPerStrengthPoint);
     }
 
     /// <summary>

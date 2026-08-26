@@ -10,6 +10,9 @@ internal sealed class StartupService
 {
     private const string ShortcutName = "Night Ember.lnk";
 
+    // WScript.Shell's WshWindowStyle value for an active, minimized window.
+    private const int MinimizedWindowStyle = 7;
+
     /// <summary>
     /// Gets a value indicating whether the startup shortcut currently exists.
     /// </summary>
@@ -62,7 +65,7 @@ internal sealed class StartupService
             dynamicShortcut.Arguments = "--hidden";
             dynamicShortcut.WorkingDirectory = AppContext.BaseDirectory;
             dynamicShortcut.Description = "Night Ember";
-            dynamicShortcut.WindowStyle = 7;
+            dynamicShortcut.WindowStyle = MinimizedWindowStyle;
             dynamicShortcut.Save();
         }
         finally

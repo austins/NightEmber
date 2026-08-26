@@ -13,10 +13,19 @@ namespace NightEmber.Services;
 /// </summary>
 internal sealed class AppController : IDisposable
 {
-    private const double FadeIntervalMilliseconds = 20;
+    private const int FadeIntervalMilliseconds = 20;
+    private const int MinimumFadeSteps = 2;
+    private const double GammaComparisonTolerance = 0.01;
+    private const int NeutralBrightnessPercent = 100;
+    private const int GammaErrorThrottleMinutes = 1;
+    private const int SchedulePollIntervalSeconds = 20;
+    private const int DriftCheckIntervalSeconds = 3;
+    private const int DisplayReapplyDelayMilliseconds = 1200;
+
     private readonly Dispatcher _dispatcher;
     private readonly Action _shutdown;
-    private readonly MessageThrottle _gammaErrorThrottle = new(TimeSpan.FromMinutes(1));
+    private readonly MessageThrottle _gammaErrorThrottle = new(TimeSpan.FromMinutes(GammaErrorThrottleMinutes));
+
     private readonly SettingsService _settingsService = new();
     private readonly StartupService _startupService = new();
     private readonly GammaService _gammaService = new();
@@ -35,7 +44,7 @@ internal sealed class AppController : IDisposable
     private bool _disposed;
     private bool _neutralRestored;
     private double _currentKelvin = ColorTemperature.NeutralKelvin;
-    private double _currentBrightness = 100;
+    private double _currentBrightness = NeutralBrightnessPercent;
 
     /// <inheritdoc />
     public void Dispose()
@@ -69,9 +78,16 @@ internal sealed class AppController : IDisposable
         _dispatcher = dispatcher;
         _shutdown = shutdown;
 
-        _scheduleTimer = CreateTimer(TimeSpan.FromSeconds(20), (_, _) => UpdateSchedule(false));
-        _driftTimer = CreateTimer(TimeSpan.FromSeconds(3), (_, _) => RepairGammaDrift());
-        _reapplyTimer = CreateTimer(TimeSpan.FromMilliseconds(1200), (_, _) => ReapplyDisplays());
+        _scheduleTimer = CreateTimer(
+            TimeSpan.FromSeconds(SchedulePollIntervalSeconds),
+            (_, _) => UpdateSchedule(false));
+
+        _driftTimer = CreateTimer(TimeSpan.FromSeconds(DriftCheckIntervalSeconds), (_, _) => RepairGammaDrift());
+
+        _reapplyTimer = CreateTimer(
+            TimeSpan.FromMilliseconds(DisplayReapplyDelayMilliseconds),
+            (_, _) => ReapplyDisplays());
+
         _reapplyTimer.Stop();
     }
 
@@ -275,7 +291,7 @@ internal sealed class AppController : IDisposable
 
     public static int CalculateFadeStepCount(int fadeMilliseconds)
     {
-        return Math.Max(2, (int)Math.Round(fadeMilliseconds / FadeIntervalMilliseconds));
+        return Math.Max(MinimumFadeSteps, (int)Math.Round(fadeMilliseconds / (double)FadeIntervalMilliseconds));
     }
 
     public static (double Kelvin, double Brightness) InterpolateGammaState(
@@ -346,11 +362,11 @@ internal sealed class AppController : IDisposable
         UpdateTray();
 
         var targetKelvin = isOn ? _settings.Temperature : ColorTemperature.NeutralKelvin;
-        var targetBrightness = isOn ? (double)_settings.Brightness : 100;
+        var targetBrightness = isOn ? (double)_settings.Brightness : NeutralBrightnessPercent;
         if (!fade
             || _settings.FadeMs <= 0
-            || (Math.Abs(_currentKelvin - targetKelvin) < 0.01
-                && Math.Abs(_currentBrightness - targetBrightness) < 0.01))
+            || (Math.Abs(_currentKelvin - targetKelvin) < GammaComparisonTolerance
+                && Math.Abs(_currentBrightness - targetBrightness) < GammaComparisonTolerance))
         {
             ApplyGamma(targetKelvin, targetBrightness);
             return;
