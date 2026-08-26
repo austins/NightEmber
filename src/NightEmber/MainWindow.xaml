@@ -9,26 +9,8 @@
         MinHeight="420"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
+        Icon="Resources/AppIcon.ico"
         Background="#FFF7F3EE">
-    <Window.Icon>
-        <DrawingImage>
-            <DrawingImage.Drawing>
-                <GeometryDrawing Brush="#FFFFA83C">
-                    <GeometryDrawing.Geometry>
-                        <CombinedGeometry GeometryCombineMode="Exclude">
-                            <CombinedGeometry.Geometry1>
-                                <EllipseGeometry Center="16,16" RadiusX="13" RadiusY="13" />
-                            </CombinedGeometry.Geometry1>
-                            <CombinedGeometry.Geometry2>
-                                <EllipseGeometry Center="22,11" RadiusX="13" RadiusY="13" />
-                            </CombinedGeometry.Geometry2>
-                        </CombinedGeometry>
-                    </GeometryDrawing.Geometry>
-                </GeometryDrawing>
-            </DrawingImage.Drawing>
-        </DrawingImage>
-    </Window.Icon>
-
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <Grid Margin="28,22,28,24">
             <Grid.RowDefinitions>
