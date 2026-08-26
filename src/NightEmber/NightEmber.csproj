@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <UseWPF>true</UseWPF>
+        <UseWindowsForms>true</UseWindowsForms>
+        <AssemblyTitle>Night Ember</AssemblyTitle>
+        <Product>Night Ember</Product>
+        <Copyright>Austin S.</Copyright>
+        <Description>A lightweight, portable night-light application for Windows.</Description>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="$(AssemblyName).Tests.Unit"/>
+    </ItemGroup>
+</Project>

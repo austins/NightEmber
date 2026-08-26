@@ -1,0 +1,30 @@
+name: Deploy
+
+on:
+    release:
+        types: [ published ]
+
+jobs:
+    test:
+        uses: ./.github/workflows/test.yml
+    deploy:
+        needs: test
+        permissions:
+            contents: write
+        environment: release
+        runs-on: windows-latest
+        env:
+            NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+            RELEASE_TAG: ${{ github.event.release.tag_name }}
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            -   uses: ./.github/actions/setup-dotnet-environment
+            -   name: Restore dependencies
+                run: dotnet restore ./src/NightEmber --locked-mode
+            -   name: Publish executable
+                run: dotnet publish ./src/NightEmber --no-restore -c Release /p:PublishProfile=win-x64
+            -   name: Upload release asset
+                run: gh release upload "$env:RELEASE_TAG" ./src/NightEmber/bin/publish/win-x64/NightEmber.exe --clobber
+                env:
+                    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,54 @@
+<UserControl x:Class="NightEmber.Controls.NumericUpDown"
+             x:Name="Root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             MinWidth="70"
+             Height="28"
+             PreviewMouseWheel="NumericUpDown_PreviewMouseWheel">
+    <Border BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+            BorderThickness="1"
+            Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="18" />
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="ValueTextBox"
+                     BorderThickness="0"
+                     Padding="5,0,4,0"
+                     HorizontalContentAlignment="Right"
+                     VerticalContentAlignment="Center"
+                     AutomationProperties.LabeledBy="{Binding Path=(AutomationProperties.LabeledBy), ElementName=Root}"
+                     AutomationProperties.HelpText="{Binding Path=(AutomationProperties.HelpText), ElementName=Root}"
+                     PreviewTextInput="ValueTextBox_PreviewTextInput"
+                     PreviewKeyDown="ValueTextBox_PreviewKeyDown"
+                     LostKeyboardFocus="ValueTextBox_LostKeyboardFocus" />
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition />
+                    <RowDefinition />
+                </Grid.RowDefinitions>
+
+                <RepeatButton Grid.Row="0"
+                              Style="{StaticResource SpinnerButtonStyle}"
+                              Click="IncreaseButton_Click"
+                              AutomationProperties.Name="Increase"
+                              ToolTip="Increase">
+                    <Path Data="M 2 5 L 6 1 L 10 5 Z"
+                          Style="{StaticResource SpinnerArrowStyle}" />
+                </RepeatButton>
+
+                <RepeatButton Grid.Row="1"
+                              Style="{StaticResource SpinnerButtonStyle}"
+                              Click="DecreaseButton_Click"
+                              AutomationProperties.Name="Decrease"
+                              ToolTip="Decrease">
+                    <Path Data="M 2 1 L 6 5 L 10 1 Z"
+                          Style="{StaticResource SpinnerArrowStyle}" />
+                </RepeatButton>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>
