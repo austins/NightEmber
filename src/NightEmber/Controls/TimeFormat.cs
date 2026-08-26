@@ -15,6 +15,7 @@ internal static class TimeFormat
     {
         // A one-character format is otherwise interpreted as a standard DateTime format.
         var format = token.Length == 1 ? $"%{token}" : token;
+
         return value.ToString(format, culture);
     }
 
