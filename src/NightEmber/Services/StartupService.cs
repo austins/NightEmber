@@ -58,6 +58,8 @@ internal sealed class StartupService
 
         try
         {
+            // Dynamic avoids adding an IWshRuntimeLibrary interop dependency solely
+            // to create this startup shortcut through WScript.Shell.
             dynamic dynamicShell = shell;
             shortcut = dynamicShell.CreateShortcut(ShortcutPath);
             dynamic dynamicShortcut = shortcut;
