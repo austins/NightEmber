@@ -1,4 +1,4 @@
-# Night Ember
+# 🌙 Night Ember
 
 Night Ember is a lightweight, portable night-light application for Windows. It applies a warm color temperature directly
 through each display's gamma ramp and runs quietly in the system tray.
