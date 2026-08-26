@@ -79,7 +79,7 @@ dotnet build .\NightEmber.slnx
 ## Publish a self-contained portable executable
 
 ```powershell
-dotnet publish .\src\NightEmber\NightEmber.csproj --configuration Release /p:PublishProfile=win-x64
+dotnet publish .\src\NightEmber\NightEmber.csproj --configuration Release /p:PublishProfile=win-x64 /p:RestoreLockedMode=true
 ```
 
 Output is written to:
