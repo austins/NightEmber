@@ -4,6 +4,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <UseWPF>true</UseWPF>
         <UseWindowsForms>true</UseWindowsForms>
+        <PublishSingleFile>true</PublishSingleFile>
         <AssemblyTitle>Night Ember</AssemblyTitle>
         <Product>Night Ember</Product>
         <Copyright>Austin S.</Copyright>
