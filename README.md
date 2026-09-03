@@ -28,7 +28,8 @@ through each display's gamma ramp and runs quietly in the system tray.
 4. Use the crescent moon in the system tray to toggle the effect, reopen settings, or exit.
 
 Warmth and software-dimming changes are previewed immediately and remain active while the settings window is open.
-Select **Save** to keep them; select **Cancel** or close the window to restore the active saved state.
+Select **Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray toggle
+while the window is open ends the preview and applies a manual override.
 
 Closing the settings window leaves Night Ember running in the tray. Choose **Exit**
 from the tray menu to stop the application and restore neutral display gamma.
