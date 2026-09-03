@@ -411,13 +411,13 @@ internal sealed class AppController : IDisposable
         var startKelvin = _currentKelvin;
         var startBrightness = _currentBrightness;
         var fadeDuration = TimeSpan.FromMilliseconds(_settings.FadeMs);
-        var fadeStopwatch = Stopwatch.StartNew();
+        var fadeStartedAt = Stopwatch.GetTimestamp();
 
         _fadeTimer = CreateTimer(
             TimeSpan.FromMilliseconds(FadeIntervalMilliseconds),
             (_, _) =>
             {
-                var progress = CalculateFadeProgress(fadeStopwatch.Elapsed, fadeDuration);
+                var progress = CalculateFadeProgress(Stopwatch.GetElapsedTime(fadeStartedAt), fadeDuration);
                 if (progress >= 1)
                 {
                     ApplyGamma(targetKelvin, targetBrightness);
