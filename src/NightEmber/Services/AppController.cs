@@ -14,7 +14,6 @@ namespace NightEmber.Services;
 internal sealed class AppController : IDisposable
 {
     private const int FadeIntervalMilliseconds = 20;
-    private const int MinimumFadeSteps = 2;
     private const double GammaComparisonTolerance = 0.01;
     private const int NeutralBrightnessPercent = 100;
     private const int GammaErrorThrottleMinutes = 1;
@@ -45,6 +44,8 @@ internal sealed class AppController : IDisposable
     private bool _neutralRestored;
     private double _currentKelvin = ColorTemperature.NeutralKelvin;
     private double _currentBrightness = NeutralBrightnessPercent;
+    private int _previewTemperature = ColorTemperature.NeutralKelvin;
+    private int _previewBrightness = NeutralBrightnessPercent;
 
     /// <inheritdoc />
     public void Dispose()
@@ -105,8 +106,7 @@ internal sealed class AppController : IDisposable
     /// Loads configuration and starts the tray, display, scheduling, and recovery services.
     /// </summary>
     /// <param name="hidden">
-    /// <see langword="true" /> to suppress the first-run settings window; otherwise,
-    /// <see langword="false" />.
+    /// <see langword="true" /> to suppress the first-run settings window; otherwise, <see langword="false" />.
     /// </param>
     public void Initialize(bool hidden)
     {
@@ -223,8 +223,16 @@ internal sealed class AppController : IDisposable
             return;
         }
 
+        _previewTemperature = temperature;
+        _previewBrightness = brightness;
         _previewing = true;
         StopFade();
+
+        if (GammaStatesMatch(_currentKelvin, _currentBrightness, temperature, brightness))
+        {
+            return;
+        }
+
         ApplyGamma(temperature, brightness);
     }
 
@@ -289,9 +297,20 @@ internal sealed class AppController : IDisposable
         return (manualOverride ?? scheduledState, manualOverride);
     }
 
-    public static int CalculateFadeStepCount(int fadeMilliseconds)
+    /// <summary>
+    /// Calculates clamped fade progress from monotonic elapsed time.
+    /// </summary>
+    /// <param name="elapsed">The elapsed fade time.</param>
+    /// <param name="duration">The configured fade duration.</param>
+    /// <returns>A progress value from zero through one.</returns>
+    public static double CalculateFadeProgress(TimeSpan elapsed, TimeSpan duration)
     {
-        return Math.Max(MinimumFadeSteps, (int)Math.Round(fadeMilliseconds / (double)FadeIntervalMilliseconds));
+        if (duration <= TimeSpan.Zero)
+        {
+            return 1;
+        }
+
+        return Math.Clamp(elapsed / duration, 0, 1);
     }
 
     public static (double Kelvin, double Brightness) InterpolateGammaState(
@@ -299,12 +318,30 @@ internal sealed class AppController : IDisposable
         double startBrightness,
         double targetKelvin,
         double targetBrightness,
-        int currentStep,
-        int stepCount)
+        double progress)
     {
-        var progress = Math.Clamp(currentStep / (double)stepCount, 0, 1);
+        progress = Math.Clamp(progress, 0, 1);
+
         return (startKelvin + (targetKelvin - startKelvin) * progress,
             startBrightness + (targetBrightness - startBrightness) * progress);
+    }
+
+    /// <summary>
+    /// Determines whether two gamma states are equivalent within the application tolerance.
+    /// </summary>
+    /// <param name="firstKelvin">The first color temperature in Kelvin.</param>
+    /// <param name="firstBrightness">The first brightness percentage.</param>
+    /// <param name="secondKelvin">The second color temperature in Kelvin.</param>
+    /// <param name="secondBrightness">The second brightness percentage.</param>
+    /// <returns><see langword="true" /> when both values are within tolerance; otherwise, <see langword="false" />.</returns>
+    public static bool GammaStatesMatch(
+        double firstKelvin,
+        double firstBrightness,
+        double secondKelvin,
+        double secondBrightness)
+    {
+        return Math.Abs(firstKelvin - secondKelvin) < GammaComparisonTolerance
+               && Math.Abs(firstBrightness - secondBrightness) < GammaComparisonTolerance;
     }
 
     private void Exit()
@@ -365,8 +402,7 @@ internal sealed class AppController : IDisposable
         var targetBrightness = isOn ? (double)_settings.Brightness : NeutralBrightnessPercent;
         if (!fade
             || _settings.FadeMs <= 0
-            || (Math.Abs(_currentKelvin - targetKelvin) < GammaComparisonTolerance
-                && Math.Abs(_currentBrightness - targetBrightness) < GammaComparisonTolerance))
+            || GammaStatesMatch(_currentKelvin, _currentBrightness, targetKelvin, targetBrightness))
         {
             ApplyGamma(targetKelvin, targetBrightness);
             return;
@@ -374,15 +410,15 @@ internal sealed class AppController : IDisposable
 
         var startKelvin = _currentKelvin;
         var startBrightness = _currentBrightness;
-        var stepCount = CalculateFadeStepCount(_settings.FadeMs);
-        var currentStep = 0;
+        var fadeDuration = TimeSpan.FromMilliseconds(_settings.FadeMs);
+        var fadeStopwatch = Stopwatch.StartNew();
 
         _fadeTimer = CreateTimer(
             TimeSpan.FromMilliseconds(FadeIntervalMilliseconds),
             (_, _) =>
             {
-                currentStep++;
-                if (currentStep >= stepCount)
+                var progress = CalculateFadeProgress(fadeStopwatch.Elapsed, fadeDuration);
+                if (progress >= 1)
                 {
                     ApplyGamma(targetKelvin, targetBrightness);
                     StopFade();
@@ -394,8 +430,8 @@ internal sealed class AppController : IDisposable
                     startBrightness,
                     targetKelvin,
                     targetBrightness,
-                    currentStep,
-                    stepCount);
+                    progress);
+
                 ApplyGamma(state.Kelvin, state.Brightness);
             });
         _fadeTimer.Start();
@@ -466,7 +502,15 @@ internal sealed class AppController : IDisposable
         try
         {
             _gammaService.OpenDisplays();
-            UpdateSchedule(true);
+
+            if (_previewing)
+            {
+                ApplyGamma(_previewTemperature, _previewBrightness);
+            }
+            else
+            {
+                UpdateSchedule(true);
+            }
         }
         catch (Exception exception) when (IsDisplayException(exception))
         {

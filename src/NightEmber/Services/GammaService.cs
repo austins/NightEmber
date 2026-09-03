@@ -15,6 +15,8 @@ internal sealed class GammaService : IDisposable
     private const int DriftTolerance = 256;
 
     private readonly List<DisplayContext> _displays = [];
+    private readonly ushort[] _rampBuffer = new ushort[GammaRampBuilder.RampElementCount];
+    private readonly ushort[] _readbackBuffer = new ushort[GammaRampBuilder.RampElementCount];
     private ushort? _expectedBlue;
     private double _lastKelvin = ColorTemperature.NeutralKelvin;
     private double _lastBrightness = 100;
@@ -82,19 +84,20 @@ internal sealed class GammaService : IDisposable
 
         var rgb = ColorTemperature.ToRgb(kelvin);
         var brightness = Math.Clamp(brightnessPercent / PercentageScale, GammaRampBuilder.DriverMinimumMultiplier, 1.0);
-        var ramp = GammaRampBuilder.Build(rgb.Red, rgb.Green, rgb.Blue, brightness, true);
+        GammaRampBuilder.BuildInto(_rampBuffer, rgb.Red, rgb.Green, rgb.Blue, brightness, true);
 
-        if (ApplyToAll(ramp))
+        if (ApplyToAll(_rampBuffer))
         {
-            RememberRamp(ramp, kelvin, brightnessPercent);
+            RememberRamp(_rampBuffer, kelvin, brightnessPercent);
             return true;
         }
 
         OpenDisplays();
-        var applied = ApplyToAll(ramp);
+
+        var applied = ApplyToAll(_rampBuffer);
         if (applied)
         {
-            RememberRamp(ramp, kelvin, brightnessPercent);
+            RememberRamp(_rampBuffer, kelvin, brightnessPercent);
         }
 
         return applied;
@@ -109,11 +112,11 @@ internal sealed class GammaService : IDisposable
         ThrowIfDisposed();
         EnsureDisplays();
 
-        var ramp = GammaRampBuilder.Build(1, 1, 1, 1, false);
-        var applied = ApplyToAll(ramp);
+        GammaRampBuilder.BuildInto(_rampBuffer, 1, 1, 1, 1, false);
+        var applied = ApplyToAll(_rampBuffer);
         if (applied)
         {
-            RememberRamp(ramp, ColorTemperature.NeutralKelvin, 100);
+            RememberRamp(_rampBuffer, ColorTemperature.NeutralKelvin, 100);
         }
 
         return applied;
@@ -134,15 +137,14 @@ internal sealed class GammaService : IDisposable
             return;
         }
 
-        var readback = new ushort[GammaRampBuilder.RampLength * 3];
         foreach (var display in _displays)
         {
-            if (!NativeMethods.GetDeviceGammaRamp(display.Handle, readback))
+            if (!NativeMethods.GetDeviceGammaRamp(display.Handle, _readbackBuffer))
             {
                 continue;
             }
 
-            var actualBlue = readback[2 * GammaRampBuilder.RampLength + RampMidpointIndex];
+            var actualBlue = _readbackBuffer[2 * GammaRampBuilder.RampLength + RampMidpointIndex];
             if (HasDrifted(_expectedBlue.Value, actualBlue))
             {
                 Apply(_lastKelvin, _lastBrightness);
