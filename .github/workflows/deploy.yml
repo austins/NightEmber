@@ -17,11 +17,24 @@ jobs:
             NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
             RELEASE_TAG: ${{ github.event.release.tag_name }}
         steps:
+            -   name: Validate release tag
+                run: |
+                    $tag = "$env:RELEASE_TAG" -replace '^v', ''
+                    $parsed = $null
+                    if (-not [System.Management.Automation.SemanticVersion]::TryParse($tag, [ref]$parsed)) {
+                        Write-Output "::error::Release tag '$env:RELEASE_TAG' is not a valid version. Expected MAJOR.MINOR.PATCH[-prerelease], with an optional leading 'v'."
+                        exit 1
+                    }
+                    $version = "$($parsed.Major).$($parsed.Minor).$($parsed.Patch)"
+                    if ($parsed.PreReleaseLabel) {
+                        $version += "-$($parsed.PreReleaseLabel)"
+                    }
+                    "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             -   name: Checkout
                 uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             -   uses: ./.github/actions/setup-dotnet-environment
             -   name: Publish executable
-                run: dotnet publish ./src/NightEmber -c Release /p:PublishProfile=win-x64 /p:RestoreLockedMode=true
+                run: dotnet publish ./src/NightEmber -c Release /p:PublishProfile=win-x64 /p:RestoreLockedMode=true /p:Version=$env:VERSION
             -   name: Upload release asset
                 run: gh release upload "$env:RELEASE_TAG" ./src/NightEmber/bin/publish/win-x64/NightEmber.exe --clobber
                 env:
