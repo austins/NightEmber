@@ -55,9 +55,16 @@ Disabled custom-time fields are skipped.
 
 In time fields, **Left/Right** selects the hour, minute, or AM/PM segment and **Up/Down** adjusts it. In the transition
 field, **Up/Down** adjusts the duration by 50 milliseconds. Modified arrow keys retain normal text-editing behavior.
-Inside these fields, **Enter** commits the edit and **Escape** restores it; use **Alt+S** or **Alt+C** to save or cancel
-the whole window. Elsewhere, Enter and Escape activate the default Save and Cancel actions when not consumed by a
-control.
+While typing a time, **Left/Right** moves the caret so you can correct the text; committing a valid edit restores
+segment navigation. Inside these fields, **Enter** commits the edit and **Escape** restores it; use **Alt+S** or
+**Alt+C** to save or cancel the whole window. Elsewhere, Enter and Escape activate the default Save and Cancel actions
+when not consumed by a control.
+
+Invalid times and transition durations stay visible when you press Enter or leave the field. A themed error outline and
+inline message explain what needs correcting; Save keeps the window open and focuses the first invalid input. Correct
+the text or press Escape in the field to restore its last accepted value. Transition durations must be whole numbers
+from 0 to 5000 ms. Custom turn-on/off times must differ; unused custom-time fields do not block saving manual or sunset
+schedules.
 
 For the tray icon, press **Win+B**, then use the arrow keys to select Night Ember (open the hidden-icons area if
 needed). **Enter** opens settings; **Shift+F10** or the context-menu key opens its menu. In the menu, use **Up/Down**

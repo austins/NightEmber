@@ -1,8 +1,10 @@
+using NightEmber.Controls;
 using NightEmber.Models;
 using NightEmber.Services;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -24,6 +26,7 @@ public sealed partial class MainWindow : Window
     private readonly AppController _controller;
     private int _originalTemperature;
     private bool _saved;
+    private bool _showScheduleValidation;
 
     /// <summary>
     /// Initializes the settings window from the active application state.
@@ -65,7 +68,7 @@ public sealed partial class MainWindow : Window
     /// </remarks>
     internal static bool IsCustomWindowValid(bool isCustomMode, TimeSpan on, TimeSpan off)
     {
-        return !isCustomMode || on != off;
+        return !isCustomMode || AppSettings.FormatTime(on) != AppSettings.FormatTime(off);
     }
 
     internal static AppSettings BuildSettings(
@@ -178,26 +181,8 @@ public sealed partial class MainWindow : Window
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!CustomOnInput.CommitEdit() || !CustomOffInput.CommitEdit())
+        if (!ValidateInputs())
         {
-            MessageBox.Show(
-                $"Enter both times using your Windows time format, for example "
-                + $"{DateTime.Today.AddHours(21).ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture)}.",
-                "Night Ember",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        FadeDurationInput.CommitEdit();
-
-        if (!IsCustomWindowValid(CustomModeRadio.IsChecked == true, CustomOnInput.TimeValue, CustomOffInput.TimeValue))
-        {
-            MessageBox.Show(
-                "Set different turn-on and turn-off times. Night Ember never changes state when both times match.",
-                "Night Ember",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
             return;
         }
 
@@ -258,5 +243,54 @@ public sealed partial class MainWindow : Window
     private void UpdateScheduleControls()
     {
         CustomTimePanel.IsEnabled = CustomModeRadio.IsChecked == true;
+        UpdateScheduleValidation();
+    }
+
+    private bool ValidateInputs()
+    {
+        _showScheduleValidation = true;
+        var custom = CustomModeRadio.IsChecked == true;
+        var onValid = !custom || CustomOnInput.CommitEdit();
+        var offValid = !custom || CustomOffInput.CommitEdit();
+        var durationValid = FadeDurationInput.CommitEdit();
+        UpdateScheduleValidation();
+
+        UserControl? invalidInput = !onValid ? CustomOnInput :
+            !offValid || ScheduleErrorText.Text.Length > 0 ? CustomOffInput :
+            !durationValid ? FadeDurationInput : null;
+        if (invalidInput is null)
+        {
+            return true;
+        }
+
+        InputValidation.FocusEditor(invalidInput);
+        return false;
+    }
+
+    private void ScheduleTimes_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_initialized)
+        {
+            UpdateScheduleValidation();
+        }
+    }
+
+    private void UpdateScheduleValidation()
+    {
+        var invalid = _showScheduleValidation
+                      && CustomModeRadio.IsChecked == true
+                      && CustomOnInput.TryGetEditedTime(out var on)
+                      && CustomOffInput.TryGetEditedTime(out var off)
+                      && !IsCustomWindowValid(true, on, off);
+        var message = invalid
+            ? "Set different turn-on and turn-off times. Matching times would never turn Night Ember on."
+            : string.Empty;
+        if (ScheduleErrorText.Text != message)
+        {
+            ScheduleErrorText.Text = message;
+            UIElementAutomationPeer
+                .FromElement(ScheduleErrorText)
+                ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+        }
     }
 }

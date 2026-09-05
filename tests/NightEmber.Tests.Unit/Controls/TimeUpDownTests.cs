@@ -57,6 +57,8 @@ public sealed class TimeUpDownTests
     [InlineData("de-DE", "HH:mm", "07:05", 7, 5)]
     [InlineData("en-US", "h:mm tt", "12:00 AM", 0, 0)]
     [InlineData("en-US", "h:mm tt", "12:00 PM", 12, 0)]
+    [InlineData("en-US", "h:mm t", "7:05 P", 19, 5)]
+    [InlineData("en-US", "tt h:mm", "PM 7:05", 19, 5)]
     public async Task CommitEdit_CultureSpecificTime_UsesCurrentCulture(
         string cultureName,
         string pattern,
@@ -85,7 +87,11 @@ public sealed class TimeUpDownTests
     [InlineData("")]
     [InlineData("not a time")]
     [InlineData("25:99")]
-    public async Task CommitEdit_InvalidText_RestoresPreviousValue(string text)
+    [InlineData("1212:00 PM")]
+    [InlineData("01/01/2026")]
+    [InlineData("01/01/0001")]
+    [InlineData("01/01/0001 09:00")]
+    public async Task CommitEdit_InvalidText_PreservesEditAndPreviousValue(string text)
     {
         await WpfTestHelper.RunAsync(() =>
         {
@@ -100,7 +106,9 @@ public sealed class TimeUpDownTests
             // Assert
             committed.Should().BeFalse();
             control.TimeValue.Should().Be(new TimeSpan(7, 5, 0));
-            Input(control).Text.Should().Be("07:05");
+            Input(control).Text.Should().Be(text);
+            InputValidation.GetHasError(control).Should().BeTrue();
+            InputValidation.GetErrorMessage(control).Should().Contain("21:00");
         });
     }
 

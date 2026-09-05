@@ -629,7 +629,7 @@ public sealed class AppControllerTests
         result.Should().Be(expected);
     }
 
-    private sealed class ControllerFixture : IDisposable
+    internal sealed class ControllerFixture : IDisposable
     {
         public ControllerFixture(int fadeMilliseconds = 0)
         {
@@ -663,7 +663,7 @@ public sealed class AppControllerTests
         }
     }
 
-    private sealed class FakeGamma(List<string> events) : IGammaService
+    internal sealed class FakeGamma(List<string> events) : IGammaService
     {
         private bool _disposed;
 
@@ -737,7 +737,7 @@ public sealed class AppControllerTests
         }
     }
 
-    private sealed class FakeRuntime(List<string> events) : IAppControllerRuntime
+    internal sealed class FakeRuntime(List<string> events) : IAppControllerRuntime
     {
         public DateTime Now { get; set; } = new(2026, 9, 4, 22, 0, 0, DateTimeKind.Local);
 
@@ -833,7 +833,7 @@ public sealed class AppControllerTests
         }
     }
 
-    private sealed class FakeTimer(TimeSpan interval, EventHandler handler) : IControllerTimer
+    internal sealed class FakeTimer(TimeSpan interval, EventHandler handler) : IControllerTimer
     {
         public TimeSpan Interval { get; } = interval;
 

@@ -4,7 +4,7 @@
         xmlns:controls="clr-namespace:NightEmber.Controls"
         Title="Night Ember"
         Width="500"
-        Height="760"
+        Height="780"
         MinWidth="460"
         MinHeight="420"
         WindowStartupLocation="CenterScreen"
@@ -14,6 +14,20 @@
         KeyboardNavigation.TabNavigation="Cycle"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="InputErrorTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+            <Style.Triggers>
+                <Trigger Property="Text" Value="">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -140,7 +154,12 @@
                                          Checked="ScheduleMode_Checked"
                                          Margin="0,0,0,8" />
                         </StackPanel>
-                        <Grid x:Name="CustomTimePanel" Margin="22,0,0,0">
+                        <Grid x:Name="CustomTimePanel" Margin="22,0,0,0"
+                              TextBoxBase.TextChanged="ScheduleTimes_TextChanged">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="110" />
@@ -174,6 +193,21 @@
                                                  AutomationProperties.LabeledBy="{Binding ElementName=CustomOffLabel}"
                                                  AutomationProperties.AcceleratorKey="Alt+F"
                                                  AutomationProperties.HelpText="Turn-off time. Type a time or use Left and Right to select hours, minutes, or AM/PM, then Up and Down to adjust. Enter commits the edit; Escape restores it." />
+                            <StackPanel Grid.Row="1" Grid.ColumnSpan="5"
+                                        Visibility="{Binding IsChecked, ElementName=CustomModeRadio, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock x:Name="CustomOnErrorText"
+                                           Style="{StaticResource InputErrorTextStyle}"
+                                           Text="{Binding Path=(controls:InputValidation.ErrorMessage), ElementName=CustomOnInput, StringFormat='Turn on: {0}'}"
+                                           Visibility="{Binding Path=(controls:InputValidation.HasError), ElementName=CustomOnInput, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <TextBlock x:Name="CustomOffErrorText"
+                                           Style="{StaticResource InputErrorTextStyle}"
+                                           Text="{Binding Path=(controls:InputValidation.ErrorMessage), ElementName=CustomOffInput, StringFormat='Turn off: {0}'}"
+                                           Visibility="{Binding Path=(controls:InputValidation.HasError), ElementName=CustomOffInput, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                <TextBlock x:Name="ScheduleErrorText"
+                                           Text=""
+                                           AutomationProperties.LiveSetting="Assertive"
+                                           Style="{StaticResource InputErrorTextStyle}" />
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </GroupBox>
@@ -184,6 +218,7 @@
                         <ColumnDefinition Width="110" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
@@ -202,8 +237,12 @@
                                             AutomationProperties.AcceleratorKey="Alt+T"
                                             AutomationProperties.HelpText="Transition duration, from 0 to 5000 milliseconds. Type a value or use Up and Down to adjust by 50 milliseconds. Enter commits the edit; Escape restores it."
                                             VerticalAlignment="Center" />
+                    <TextBlock x:Name="FadeDurationErrorText"
+                               Grid.Row="1" Grid.ColumnSpan="2"
+                               Style="{StaticResource InputErrorTextStyle}"
+                               Text="{Binding Path=(controls:InputValidation.ErrorMessage), ElementName=FadeDurationInput}" />
                     <CheckBox x:Name="StartupCheckBox"
-                              Grid.Row="1"
+                              Grid.Row="2"
                               Grid.Column="0"
                               Grid.ColumnSpan="2"
                               Content="Start _automatically when I sign in"
@@ -229,7 +268,7 @@
                 <Button IsCancel="True" Click="CancelButton_Click" Margin="0,0,10,0">
                     <AccessText Text="_Cancel" />
                 </Button>
-                <Button IsDefault="True" Click="SaveButton_Click"
+                <Button x:Name="SaveButton" IsDefault="True" Click="SaveButton_Click"
                         Style="{DynamicResource AccentButtonStyle}" Padding="18,7" MinWidth="82">
                     <AccessText Text="_Save" />
                 </Button>

@@ -23,16 +23,12 @@
             </Grid.ColumnDefinitions>
 
             <TextBox x:Name="ValueTextBox"
-                     MinHeight="0"
-                     MinWidth="0"
-                     BorderThickness="0"
-                     Padding="5,0,4,0"
+                     Style="{StaticResource SpinnerTextBoxStyle}"
                      HorizontalContentAlignment="Right"
-                     VerticalContentAlignment="Center"
                      AutomationProperties.LabeledBy="{Binding Path=(AutomationProperties.LabeledBy), ElementName=Root}"
                      AutomationProperties.AcceleratorKey="{Binding Path=(AutomationProperties.AcceleratorKey), ElementName=Root}"
                      AutomationProperties.HelpText="{Binding Path=(AutomationProperties.HelpText), ElementName=Root}"
-                     PreviewTextInput="ValueTextBox_PreviewTextInput"
+                     TextChanged="ValueTextBox_TextChanged"
                      PreviewKeyDown="ValueTextBox_PreviewKeyDown"
                      LostKeyboardFocus="ValueTextBox_LostKeyboardFocus" />
 

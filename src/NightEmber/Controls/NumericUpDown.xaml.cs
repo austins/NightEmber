@@ -50,6 +50,7 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
             CoerceValue));
 
     private bool _updatingText;
+    private bool _validateEdits;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NumericUpDown" /> class.
@@ -57,7 +58,6 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
     public NumericUpDown()
     {
         InitializeComponent();
-        DataObject.AddPastingHandler(ValueTextBox, OnPaste);
         UpdateText();
     }
 
@@ -98,17 +98,21 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
     }
 
     /// <summary>
-    /// Parses the current text, clamps it to the configured range, and updates
-    /// <see cref="NumericValue" />.
+    /// Commits an integer within the configured range, preserving invalid text
+    /// with a validation message until corrected or cancelled.
     /// </summary>
-    public void CommitEdit()
+    /// <returns>Whether the edit was valid and committed.</returns>
+    public bool CommitEdit()
     {
-        if (int.TryParse(ValueTextBox.Text, NumberStyles.None, CultureInfo.CurrentCulture, out var value))
+        if (!ValidateEdit(out var value))
         {
-            SetCurrentValue(NumericValueProperty, Math.Clamp(value, Minimum, Maximum));
+            _validateEdits = true;
+            return false;
         }
 
+        SetCurrentValue(NumericValueProperty, value);
         UpdateText();
+        return true;
     }
 
     protected override void OnAccessKey(AccessKeyEventArgs e)
@@ -142,7 +146,11 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
 
     private void ChangeValue(int direction)
     {
-        CommitEdit();
+        if (!CommitEdit())
+        {
+            return;
+        }
+
         SetCurrentValue(NumericValueProperty, Math.Clamp(NumericValue + direction * Increment, Minimum, Maximum));
         ValueTextBox.Focus();
         ValueTextBox.SelectAll();
@@ -158,6 +166,28 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
         _updatingText = true;
         ValueTextBox.Text = NumericValue.ToString(CultureInfo.CurrentCulture);
         _updatingText = false;
+        _validateEdits = false;
+        InputValidation.SetError(this, ValueTextBox, string.Empty);
+    }
+
+    private bool ValidateEdit(out int value)
+    {
+        var valid = int.TryParse(ValueTextBox.Text, NumberStyles.None, CultureInfo.CurrentCulture, out value)
+                    && value >= Minimum
+                    && value <= Maximum;
+        InputValidation.SetError(
+            this,
+            ValueTextBox,
+            valid ? string.Empty : $"Enter a whole number from {Minimum} to {Maximum}.");
+        return valid;
+    }
+
+    private void ValueTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (!_updatingText && _validateEdits)
+        {
+            ValidateEdit(out _);
+        }
     }
 
     private void IncreaseButton_Click(object sender, RoutedEventArgs e)
@@ -168,11 +198,6 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
     private void DecreaseButton_Click(object sender, RoutedEventArgs e)
     {
         ChangeValue(-1);
-    }
-
-    private void ValueTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        e.Handled = !e.Text.All(char.IsDigit);
     }
 
     private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -218,20 +243,5 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
 
         ChangeValue(e.Delta > 0 ? 1 : -1);
         e.Handled = true;
-    }
-
-    private static void OnPaste(object sender, DataObjectPastingEventArgs e)
-    {
-        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText))
-        {
-            e.CancelCommand();
-            return;
-        }
-
-        var text = e.SourceDataObject.GetData(DataFormats.UnicodeText) as string;
-        if (string.IsNullOrEmpty(text) || !text.All(char.IsDigit))
-        {
-            e.CancelCommand();
-        }
     }
 }

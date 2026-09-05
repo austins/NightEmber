@@ -1,9 +1,135 @@
+using NightEmber.Controls;
 using NightEmber.Models;
+using NightEmber.Tests.Unit.Services;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 
 namespace NightEmber.Tests.Unit;
 
 public sealed class MainWindowTests
 {
+    [Theory]
+    [InlineData("CustomOnInput", "1212:00 PM", "CustomOnErrorText")]
+    [InlineData("CustomOffInput", "", "CustomOffErrorText")]
+    [InlineData("FadeDurationInput", "5001", "FadeDurationErrorText")]
+    [InlineData("FadeDurationInput", "", "FadeDurationErrorText")]
+    [InlineData("FadeDurationInput", "99999999999999", "FadeDurationErrorText")]
+    public async Task Save_InvalidInput_PreservesTextShowsInlineErrorAndDoesNotSave(
+        string inputName,
+        string text,
+        string errorName)
+    {
+        await WithWindow((window, fixture) =>
+        {
+            // Arrange
+            var control = (UserControl)window.FindName(inputName);
+            var input = (TextBox)control.FindName("ValueTextBox");
+            input.Text = text;
+
+            // Act
+            Save(window);
+            Save(window);
+
+            // Assert
+            fixture.Runtime.Saved.Should().BeNull();
+            input.Text.Should().Be(text);
+            InputValidation.GetHasError(control).Should().BeTrue();
+            var error = (TextBlock)window.FindName(errorName);
+            error.Text.Should().Contain(InputValidation.GetErrorMessage(control));
+            error.Visibility.Should().Be(Visibility.Visible);
+        });
+    }
+
+    [Fact]
+    public async Task Save_MultipleInvalidInputs_ReportsEveryFieldThenSavesCorrections()
+    {
+        await WithWindow((window, fixture) =>
+        {
+            // Arrange
+            var on = (TimeUpDown)window.FindName("CustomOnInput");
+            var off = (TimeUpDown)window.FindName("CustomOffInput");
+            var duration = (NumericUpDown)window.FindName("FadeDurationInput");
+            ((TextBox)on.FindName("ValueTextBox")).Text = "invalid";
+            ((TextBox)off.FindName("ValueTextBox")).Text = "invalid";
+            ((TextBox)duration.FindName("ValueTextBox")).Text = "5001";
+
+            // Act
+            Save(window);
+            var errors = new[]
+            {
+                InputValidation.GetHasError(on),
+                InputValidation.GetHasError(off),
+                InputValidation.GetHasError(duration)
+            };
+            ((TextBox)on.FindName("ValueTextBox")).Text = "22:30";
+            ((TextBox)off.FindName("ValueTextBox")).Text = "06:15";
+            ((TextBox)duration.FindName("ValueTextBox")).Text = "5000";
+            Save(window);
+
+            // Assert
+            errors.Should().AllBeEquivalentTo(true);
+            fixture.Runtime.Saved.Should().NotBeNull();
+            fixture.Runtime.Saved.CustomOn.Should().Be("22:30");
+            fixture.Runtime.Saved.CustomOff.Should().Be("06:15");
+            fixture.Runtime.Saved.FadeMs.Should().Be(5000);
+        });
+    }
+
+    [Theory]
+    [InlineData("ManualModeRadio", (int)ScheduleMode.Manual)]
+    [InlineData("SunsetModeRadio", (int)ScheduleMode.Sunset)]
+    public async Task Save_InactiveCustomInputs_DoesNotBlockOnUnusedInvalidEdits(string radioName, int mode)
+    {
+        await WithWindow((window, fixture) =>
+        {
+            // Arrange
+            var on = (TimeUpDown)window.FindName("CustomOnInput");
+            ((TextBox)on.FindName("ValueTextBox")).Text = "invalid";
+            on.CommitEdit();
+            ((RadioButton)window.FindName(radioName)).IsChecked = true;
+
+            // Act
+            Save(window);
+
+            // Assert
+            fixture.Runtime.Saved.Should().NotBeNull();
+            fixture.Runtime.Saved.Mode.Should().Be((ScheduleMode)mode);
+            fixture.Runtime.Saved.CustomOn.Should().Be("21:00");
+            var error = (TextBlock)window.FindName("CustomOnErrorText");
+            ((StackPanel)error.Parent).Visibility.Should().Be(Visibility.Collapsed);
+        });
+    }
+
+    [Fact]
+    public async Task Save_MatchingScheduleTimes_ShowsInlineErrorThatClearsWhenCorrected()
+    {
+        await WithWindow((window, fixture) =>
+        {
+            // Arrange
+            var off = (TimeUpDown)window.FindName("CustomOffInput");
+            var input = (TextBox)off.FindName("ValueTextBox");
+            input.Text = "21:00";
+
+            // Act
+            Save(window);
+            var error = (TextBlock)window.FindName("ScheduleErrorText");
+            var message = error.Text;
+            var savedBeforeCorrection = fixture.Runtime.Saved;
+            input.Text = "07:00";
+            var correctedMessage = error.Text;
+            Save(window);
+
+            // Assert
+            savedBeforeCorrection.Should().BeNull();
+            message.Should().Contain("different");
+            correctedMessage.Should().BeEmpty();
+            fixture.Runtime.Saved.Should().NotBeNull();
+            fixture.Runtime.Saved.CustomOff.Should().Be("07:00");
+        });
+    }
+
     [Theory]
     [InlineData(3400, 58, 3400)]
     [InlineData(3400, 58.4, 3400)]
@@ -99,5 +225,42 @@ public sealed class MainWindowTests
 
         // Assert
         result.Should().Be(expected);
+    }
+
+    [Fact]
+    public void IsCustomWindowValid_TimesWithinSameMinute_RejectsIdenticalPersistedTimes()
+    {
+        // Arrange
+        var on = new TimeSpan(21, 0, 15);
+        var off = new TimeSpan(21, 0, 45);
+
+        // Act
+        var result = MainWindow.IsCustomWindowValid(true, on, off);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    private static Task WithWindow(Action<MainWindow, AppControllerTests.ControllerFixture> action)
+    {
+        return WpfTestHelper.RunAsync(() =>
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-GB");
+            using var fixture = new AppControllerTests.ControllerFixture();
+            var window = new MainWindow(fixture.Controller);
+            try
+            {
+                action(window, fixture);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    private static void Save(MainWindow window)
+    {
+        ((Button)window.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
     }
 }

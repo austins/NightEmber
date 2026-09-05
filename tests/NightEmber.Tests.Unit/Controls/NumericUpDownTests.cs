@@ -76,14 +76,16 @@ public sealed class NumericUpDownTests
     }
 
     [Theory]
-    [InlineData("35", 35)]
-    [InlineData("150", 100)]
-    [InlineData("", 25)]
-    [InlineData("invalid", 25)]
-    [InlineData("12.5", 25)]
-    [InlineData("-10", 25)]
-    [InlineData("2147483648", 25)]
-    public async Task CommitEdit_ValidOrInvalidText_ClampsOrRestoresValue(string text, int expected)
+    [InlineData("0", 0, true)]
+    [InlineData("35", 35, true)]
+    [InlineData("100", 100, true)]
+    [InlineData("150", 25, false)]
+    [InlineData("", 25, false)]
+    [InlineData("invalid", 25, false)]
+    [InlineData("12.5", 25, false)]
+    [InlineData("-10", 25, false)]
+    [InlineData("2147483648", 25, false)]
+    public async Task CommitEdit_ValidOrInvalidText_CommitsOrPreservesInvalidEdit(string text, int expected, bool valid)
     {
         await WpfTestHelper.RunAsync(() =>
         {
@@ -93,11 +95,13 @@ public sealed class NumericUpDownTests
             Input(control).Text = text;
 
             // Act
-            control.CommitEdit();
+            var committed = control.CommitEdit();
 
             // Assert
+            committed.Should().Be(valid);
             control.NumericValue.Should().Be(expected);
-            Input(control).Text.Should().Be(expected.ToString(CultureInfo.InvariantCulture));
+            Input(control).Text.Should().Be(text);
+            InputValidation.GetHasError(control).Should().Be(!valid);
         });
     }
 
@@ -219,13 +223,13 @@ public sealed class NumericUpDownTests
     }
 
     [Theory]
-    [InlineData("42", false)]
-    [InlineData("", true)]
-    [InlineData("-42", true)]
-    [InlineData("4 2", true)]
-    [InlineData("12.5", true)]
-    [InlineData("abc", true)]
-    public async Task Paste_Text_RejectsAnythingExceptDigits(string text, bool cancelled)
+    [InlineData("42")]
+    [InlineData("")]
+    [InlineData("-42")]
+    [InlineData("4 2")]
+    [InlineData("12.5")]
+    [InlineData("abc")]
+    public async Task Paste_Text_DoesNotSilentlyDiscardInvalidEdits(string text)
     {
         await WpfTestHelper.RunAsync(() =>
         {
@@ -238,33 +242,16 @@ public sealed class NumericUpDownTests
             Input(control).RaiseEvent(args);
 
             // Assert
-            args.CommandCancelled.Should().Be(cancelled);
-        });
-    }
-
-    [Fact]
-    public async Task Paste_NonTextData_IsCancelled()
-    {
-        await WpfTestHelper.RunAsync(() =>
-        {
-            // Arrange
-            var control = new NumericUpDown();
-            var data = new DataObject("CustomBinary", new byte[] { 1 });
-            var args = new DataObjectPastingEventArgs(data, false, "CustomBinary");
-
-            // Act
-            Input(control).RaiseEvent(args);
-
-            // Assert
-            args.CommandCancelled.Should().BeTrue();
+            args.CommandCancelled.Should().BeFalse();
         });
     }
 
     [Theory]
-    [InlineData("42", false)]
-    [InlineData("a", true)]
-    [InlineData("-", true)]
-    public async Task TextInput_Text_RejectsNonDigits(string text, bool handled)
+    [InlineData("42")]
+    [InlineData("a")]
+    [InlineData("-")]
+    [InlineData(".")]
+    public async Task TextInput_Text_LeavesValidationToCommit(string text)
     {
         await WpfTestHelper.RunAsync(() =>
         {
@@ -281,7 +268,7 @@ public sealed class NumericUpDownTests
             input.RaiseEvent(args);
 
             // Assert
-            args.Handled.Should().Be(handled);
+            args.Handled.Should().BeFalse();
         });
     }
 

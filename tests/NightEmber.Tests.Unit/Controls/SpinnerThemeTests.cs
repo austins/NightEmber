@@ -22,6 +22,8 @@ public sealed class SpinnerThemeTests
             var border = (Border)input.Content;
             var grid = (Grid)border.Child;
             var textBox = (TextBox)grid.Children[0];
+            textBox.FontSize = 14;
+            textBox.Text = timeInput ? "12:59 PM" : "1440";
             var buttons = ((Grid)grid.Children[1]).Children.OfType<RepeatButton>().ToArray();
             var results = new List<(Brush Background, Brush Foreground, double Height)>();
             string[] themes = ["Light", "Dark", "HC"];
@@ -48,6 +50,13 @@ public sealed class SpinnerThemeTests
                 textBox.Foreground.Should().BeSameAs(host.FindResource("TextControlForeground"));
                 textBox.MinHeight.Should().Be(0);
                 textBox.ActualHeight.Should().BeLessThanOrEqualTo(28);
+                textBox.Template.FindName("DeleteButton", textBox).Should().BeNull();
+                textBox.Template.FindName("ContentBorder", textBox).Should().BeNull();
+                var contentHost = (ScrollViewer)textBox.Template.FindName("PART_ContentHost", textBox);
+                contentHost.ActualWidth.Should().Be(textBox.ActualWidth);
+                contentHost.ExtentWidth.Should().BeLessThanOrEqualTo(contentHost.ViewportWidth);
+                contentHost.Focusable.Should().BeFalse();
+                contentHost.IsTabStop.Should().BeFalse();
                 foreach (var button in buttons)
                 {
                     button.Template.Should().NotBeNull();
@@ -84,6 +93,7 @@ public sealed class SpinnerThemeTests
                         UriKind.Relative)
                 });
             var grid = (Grid)((Border)input.Content).Child;
+            var textBox = (TextBox)grid.Children[0];
             var buttons = ((Grid)grid.Children[1]).Children.OfType<RepeatButton>().ToArray();
 
             // Act
@@ -93,6 +103,7 @@ public sealed class SpinnerThemeTests
             input.UpdateLayout();
 
             // Assert
+            textBox.Foreground.Should().BeSameAs(input.FindResource("TextControlForegroundDisabled"));
             foreach (var button in buttons)
             {
                 ((System.Windows.Shapes.Path)button.Content)
