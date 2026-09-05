@@ -1,4 +1,5 @@
 using Microsoft.Win32.SafeHandles;
+using NightEmber.Display;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -126,32 +127,47 @@ internal sealed class WatchdogService : IDisposable
     {
         using var orderlyExitEvent = EventWaitHandle.OpenExisting(eventName);
 
+        Run(
+            () =>
+            {
+                using var parent = Process.GetProcessById(processId);
+                using ProcessWaitHandle parentExit = new(parent);
+                WaitHandle[] handles = [orderlyExitEvent, parentExit];
+                return WaitHandle.WaitAny(handles);
+            },
+            () => orderlyExitEvent.WaitOne(0),
+            GammaService.ResetAllDisplays);
+    }
+
+    /// <summary>
+    /// Identifies process lookup and monitoring failures that trigger the watchdog's recovery path.
+    /// </summary>
+    /// <param name="exception">The failure to classify.</param>
+    /// <returns><see langword="true" /> for argument, invalid-operation, or native Windows failures.</returns>
+    public static bool IsProcessMonitoringException(Exception exception)
+    {
+        return exception is ArgumentException or InvalidOperationException or Win32Exception;
+    }
+
+    internal static void Run(Func<int> waitForExit, Func<bool> isOrderlyExit, Action resetDisplays)
+    {
         try
         {
-            using var parent = Process.GetProcessById(processId);
-            using ProcessWaitHandle parentExit = new(parent);
-            WaitHandle[] handles = [orderlyExitEvent, parentExit];
-
-            var signaledHandle = WaitHandle.WaitAny(handles);
-            if (signaledHandle == 1 && !orderlyExitEvent.WaitOne(0))
+            var signaledHandle = waitForExit();
+            if (signaledHandle == 1 && !isOrderlyExit())
             {
-                GammaService.ResetAllDisplays();
+                resetDisplays();
             }
         }
         catch (Exception exception) when (IsProcessMonitoringException(exception))
         {
             // The parent may exit between lookup and handle acquisition. If it did
             // not report an orderly exit, recover the display state immediately.
-            if (!orderlyExitEvent.WaitOne(0))
+            if (!isOrderlyExit())
             {
-                GammaService.ResetAllDisplays();
+                resetDisplays();
             }
         }
-    }
-
-    public static bool IsProcessMonitoringException(Exception exception)
-    {
-        return exception is ArgumentException or InvalidOperationException or Win32Exception;
     }
 
     private sealed class ProcessWaitHandle : WaitHandle

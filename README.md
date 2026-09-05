@@ -1,7 +1,7 @@
 # 🌙 Night Ember
 
-Night Ember is a portable night-light application for Windows. It applies a warm color temperature directly
-through each display's gamma ramp and runs quietly in the system tray.
+Night Ember is a portable night-light application for Windows. It applies a warm color temperature directly through each
+display's gamma ramp and runs quietly in the system tray.
 
 <img width="510" height="652" alt="Night Ember settings" src="https://github.com/user-attachments/assets/e335d852-0ae3-407b-9b8f-7be2e0cf1ffc" />
 
@@ -28,8 +28,8 @@ through each display's gamma ramp and runs quietly in the system tray.
 4. Use the crescent moon in the system tray to toggle the effect, reopen settings, or exit.
 
 Warmth and software-dimming changes are previewed immediately and remain active while the settings window is open.
-Select **Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray toggle
-while the window is open ends the preview and applies a manual override.
+Select **Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray
+toggle while the window is open ends the preview and applies a manual override.
 
 Closing the settings window leaves Night Ember running in the tray. Choose **Exit**
 from the tray menu to stop the application and restore neutral display gamma.

@@ -20,7 +20,6 @@ public sealed partial class MainWindow : Window
     private readonly bool _initialized;
     private readonly AppController _controller;
     private int _originalTemperature;
-    private int _originalStrength;
     private bool _saved;
 
     /// <summary>
@@ -66,11 +65,34 @@ public sealed partial class MainWindow : Window
         return !isCustomMode || on != off;
     }
 
+    internal static AppSettings BuildSettings(
+        int originalTemperature,
+        double strength,
+        double brightness,
+        ScheduleMode mode,
+        TimeSpan customOn,
+        TimeSpan customOff,
+        int fadeMilliseconds)
+    {
+        var roundedStrength = (int)Math.Round(strength);
+        return new AppSettings
+        {
+            Temperature =
+                roundedStrength == TemperatureToStrength(originalTemperature)
+                    ? originalTemperature
+                    : StrengthToTemperature(roundedStrength),
+            Brightness = (int)Math.Round(brightness),
+            Mode = mode,
+            CustomOn = AppSettings.FormatTime(customOn),
+            CustomOff = AppSettings.FormatTime(customOff),
+            FadeMs = fadeMilliseconds
+        };
+    }
+
     private void LoadSettings(AppSettings settings)
     {
         StrengthSlider.Value = TemperatureToStrength(settings.Temperature);
         _originalTemperature = settings.Temperature;
-        _originalStrength = (int)Math.Round(StrengthSlider.Value);
         BrightnessSlider.Value = settings.Brightness;
 
         ManualModeRadio.IsChecked = settings.Mode == ScheduleMode.Manual;
@@ -126,7 +148,7 @@ public sealed partial class MainWindow : Window
     {
         if (!CustomOnInput.CommitEdit() || !CustomOffInput.CommitEdit())
         {
-            System.Windows.MessageBox.Show(
+            MessageBox.Show(
                 $"Enter both times using your Windows time format, for example "
                 + $"{DateTime.Today.AddHours(21).ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture)}.",
                 "Night Ember",
@@ -139,7 +161,7 @@ public sealed partial class MainWindow : Window
 
         if (!IsCustomWindowValid(CustomModeRadio.IsChecked == true, CustomOnInput.TimeValue, CustomOffInput.TimeValue))
         {
-            System.Windows.MessageBox.Show(
+            MessageBox.Show(
                 "Set different turn-on and turn-off times. Night Ember never changes state when both times match.",
                 "Night Ember",
                 MessageBoxButton.OK,
@@ -147,19 +169,15 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var settings = new AppSettings
-        {
-            Temperature =
-                (int)Math.Round(StrengthSlider.Value) == _originalStrength
-                    ? _originalTemperature
-                    : StrengthToTemperature((int)Math.Round(StrengthSlider.Value)),
-            Brightness = (int)Math.Round(BrightnessSlider.Value),
-            Mode = SunsetModeRadio.IsChecked == true ? ScheduleMode.Sunset :
-                CustomModeRadio.IsChecked == true ? ScheduleMode.Custom : ScheduleMode.Manual,
-            CustomOn = AppSettings.FormatTime(CustomOnInput.TimeValue),
-            CustomOff = AppSettings.FormatTime(CustomOffInput.TimeValue),
-            FadeMs = FadeDurationInput.NumericValue
-        };
+        var settings = BuildSettings(
+            _originalTemperature,
+            StrengthSlider.Value,
+            BrightnessSlider.Value,
+            SunsetModeRadio.IsChecked == true ? ScheduleMode.Sunset :
+            CustomModeRadio.IsChecked == true ? ScheduleMode.Custom : ScheduleMode.Manual,
+            CustomOnInput.TimeValue,
+            CustomOffInput.TimeValue,
+            FadeDurationInput.NumericValue);
 
         try
         {
@@ -168,14 +186,14 @@ public sealed partial class MainWindow : Window
             Close();
             if (warning is not null)
             {
-                System.Windows.MessageBox.Show(warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         catch (Exception exception) when (exception is IOException
                                               or UnauthorizedAccessException
                                               or System.Security.SecurityException)
         {
-            System.Windows.MessageBox.Show(
+            MessageBox.Show(
                 $"The settings could not be saved.\n\n{exception.Message}",
                 "Night Ember",
                 MessageBoxButton.OK,

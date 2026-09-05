@@ -51,7 +51,10 @@ public sealed class SettingsServiceTests : IDisposable
         var result = _service.Load();
 
         // Assert
-        result.Settings.Should().BeEquivalentTo(
+        result
+        .Settings
+        .Should()
+        .BeEquivalentTo(
             new AppSettings
             {
                 Temperature = 2400,

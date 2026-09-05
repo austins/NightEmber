@@ -57,7 +57,7 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
     public NumericUpDown()
     {
         InitializeComponent();
-        System.Windows.DataObject.AddPastingHandler(ValueTextBox, OnPaste);
+        DataObject.AddPastingHandler(ValueTextBox, OnPaste);
         UpdateText();
     }
 
@@ -169,7 +169,7 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
         e.Handled = !e.Text.All(char.IsDigit);
     }
 
-    private void ValueTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         switch (e.Key)
         {
@@ -211,13 +211,13 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
 
     private static void OnPaste(object sender, DataObjectPastingEventArgs e)
     {
-        if (!e.SourceDataObject.GetDataPresent(System.Windows.DataFormats.UnicodeText))
+        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText))
         {
             e.CancelCommand();
             return;
         }
 
-        var text = e.SourceDataObject.GetData(System.Windows.DataFormats.UnicodeText) as string;
+        var text = e.SourceDataObject.GetData(DataFormats.UnicodeText) as string;
         if (string.IsNullOrEmpty(text) || !text.All(char.IsDigit))
         {
             e.CancelCommand();

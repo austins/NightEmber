@@ -1,4 +1,4 @@
-namespace NightEmber.Services;
+namespace NightEmber.Display;
 
 internal static class GammaRampBuilder
 {

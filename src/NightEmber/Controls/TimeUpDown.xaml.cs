@@ -220,14 +220,14 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
             if (start >= 0)
             {
                 segments.Add(new SegmentRange(TimeSegment.Minute, start, minuteText.Length));
-                searchIndex = start + minuteText.Length;
             }
         }
 
-        var periodText = date.ToString("tt", culture);
+        var periodToken = TimeFormat.FindToken(pattern, 't');
+        var periodText = periodToken is null ? string.Empty : TimeFormat.FormatToken(date, periodToken, culture);
         if (!string.IsNullOrEmpty(periodText))
         {
-            var start = formatted.IndexOf(periodText, searchIndex, StringComparison.CurrentCulture);
+            var start = formatted.IndexOf(periodText, StringComparison.CurrentCulture);
             if (start >= 0)
             {
                 segments.Add(new SegmentRange(TimeSegment.Period, start, periodText.Length));
@@ -257,7 +257,7 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
         SelectSegmentAt(ValueTextBox.CaretIndex);
     }
 
-    private void ValueTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         switch (e.Key)
         {

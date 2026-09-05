@@ -12,6 +12,8 @@ public sealed class TimeFormatTests
     [InlineData("hh", "07")]
     [InlineData("m", "5")]
     [InlineData("mm", "05")]
+    [InlineData("t", "A")]
+    [InlineData("tt", "AM")]
     public void FormatToken_CustomTimeToken_ReturnsExpectedText(string token, string expected)
     {
         // Arrange
@@ -30,6 +32,9 @@ public sealed class TimeFormatTests
     [InlineData("'H' HH:mm", "HH")]
     [InlineData("\"H\" h:mm", "h")]
     [InlineData(@"\H h:mm", "h")]
+    [InlineData("'h\"' HH:mm", "HH")]
+    [InlineData("\"h'\" HH:mm", "HH")]
+    [InlineData(@"'h\'H' HH:mm", "HH")]
     public void FindToken_HourPattern_IgnoresQuotedAndEscapedCharacters(string pattern, string expected)
     {
         // Act

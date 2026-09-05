@@ -26,7 +26,7 @@ internal static class TimeFormat
     /// <returns>The matching token run, or <see langword="null" /> when none is present.</returns>
     public static string? FindToken(string pattern, params char[] tokenCharacters)
     {
-        var quoted = false;
+        var quote = '\0';
         var escaped = false;
         for (var i = 0; i < pattern.Length; i++)
         {
@@ -37,19 +37,29 @@ internal static class TimeFormat
                 continue;
             }
 
-            if (character is '\'' or '"')
-            {
-                quoted = !quoted;
-                continue;
-            }
-
             if (character == '\\')
             {
                 escaped = true;
                 continue;
             }
 
-            if (quoted || !tokenCharacters.Contains(character))
+            if (quote != '\0')
+            {
+                if (character == quote)
+                {
+                    quote = '\0';
+                }
+
+                continue;
+            }
+
+            if (character is '\'' or '"')
+            {
+                quote = character;
+                continue;
+            }
+
+            if (!tokenCharacters.Contains(character))
             {
                 continue;
             }

@@ -1,5 +1,8 @@
 using Microsoft.Win32;
+using NightEmber.Display;
 using NightEmber.Models;
+using NightEmber.Scheduling;
+using NightEmber.TrayIcon;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -21,26 +24,25 @@ internal sealed class AppController : IDisposable
     private const int DriftCheckIntervalSeconds = 3;
     private const int DisplayReapplyDelayMilliseconds = 1200;
 
-    private readonly Dispatcher _dispatcher;
+    private readonly IAppControllerRuntime _runtime;
     private readonly Action _shutdown;
     private readonly MessageThrottle _gammaErrorThrottle = new(TimeSpan.FromMinutes(GammaErrorThrottleMinutes));
 
-    private readonly SettingsService _settingsService = new();
-    private readonly StartupService _startupService = new();
-    private readonly GammaService _gammaService = new();
-    private readonly DispatcherTimer _scheduleTimer;
-    private readonly DispatcherTimer _driftTimer;
-    private readonly DispatcherTimer _reapplyTimer;
-    private DispatcherTimer? _fadeTimer;
+    private readonly IGammaService _gammaService;
+    private readonly IControllerTimer _scheduleTimer;
+    private readonly IControllerTimer _driftTimer;
+    private readonly IControllerTimer _reapplyTimer;
+    private IControllerTimer? _fadeTimer;
     private TrayIconService? _tray;
     private MainWindow? _window;
-    private AppSettings _settings = AppSettings.Default;
+    private AppSettings _settings;
     private bool _isOn;
     private bool? _manualOverride;
     private bool? _lastScheduledState;
     private bool _previewing;
     private int _exiting;
     private bool _disposed;
+    private bool _systemEventsSubscribed;
     private bool _neutralRestored;
     private double _currentKelvin = ColorTemperature.NeutralKelvin;
     private double _currentBrightness = NeutralBrightnessPercent;
@@ -75,17 +77,30 @@ internal sealed class AppController : IDisposable
     /// <param name="dispatcher">The WPF dispatcher that owns UI-bound operations.</param>
     /// <param name="shutdown">The callback that requests application shutdown.</param>
     public AppController(Dispatcher dispatcher, Action shutdown)
+        : this(static () => new GammaService(), new AppControllerRuntime(dispatcher), shutdown, AppSettings.Default)
     {
-        _dispatcher = dispatcher;
-        _shutdown = shutdown;
+    }
 
-        _scheduleTimer = CreateTimer(
+    internal AppController(
+        Func<IGammaService> createGammaService,
+        IAppControllerRuntime runtime,
+        Action shutdown,
+        AppSettings settings)
+    {
+        _gammaService = createGammaService();
+        _runtime = runtime;
+        _shutdown = shutdown;
+        _settings = settings.Clone();
+
+        _scheduleTimer = _runtime.CreateTimer(
             TimeSpan.FromSeconds(SchedulePollIntervalSeconds),
             (_, _) => UpdateSchedule(false));
 
-        _driftTimer = CreateTimer(TimeSpan.FromSeconds(DriftCheckIntervalSeconds), (_, _) => RepairGammaDrift());
+        _driftTimer = _runtime.CreateTimer(
+            TimeSpan.FromSeconds(DriftCheckIntervalSeconds),
+            (_, _) => RepairGammaDrift());
 
-        _reapplyTimer = CreateTimer(
+        _reapplyTimer = _runtime.CreateTimer(
             TimeSpan.FromMilliseconds(DisplayReapplyDelayMilliseconds),
             (_, _) => ReapplyDisplays());
 
@@ -100,7 +115,7 @@ internal sealed class AppController : IDisposable
     /// <summary>
     /// Gets a value indicating whether sign-in startup is enabled.
     /// </summary>
-    public bool IsStartupEnabled => _startupService.IsEnabled;
+    public bool IsStartupEnabled => _runtime.IsStartupEnabled;
 
     /// <summary>
     /// Loads configuration and starts the tray, display, scheduling, and recovery services.
@@ -110,7 +125,7 @@ internal sealed class AppController : IDisposable
     /// </param>
     public void Initialize(bool hidden)
     {
-        var loadResult = _settingsService.Load();
+        var loadResult = _runtime.LoadSettings();
         _settings = loadResult.Settings;
 
         _tray?.Dispose();
@@ -137,7 +152,7 @@ internal sealed class AppController : IDisposable
         {
             try
             {
-                _settingsService.Save(_settings);
+                _runtime.SaveSettings(_settings);
             }
             catch (Exception exception) when (IsSettingsException(exception))
             {
@@ -155,11 +170,7 @@ internal sealed class AppController : IDisposable
 
         if (loadResult.Warning is not null)
         {
-            System.Windows.MessageBox.Show(
-                loadResult.Warning,
-                "Night Ember",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            MessageBox.Show(loadResult.Warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -262,7 +273,7 @@ internal sealed class AppController : IDisposable
     public string? SaveSettings(AppSettings settings, bool enableStartup)
     {
         var normalized = settings.Normalize();
-        _settingsService.Save(normalized);
+        _runtime.SaveSettings(normalized);
 
         _settings = normalized;
         _manualOverride = null;
@@ -271,7 +282,7 @@ internal sealed class AppController : IDisposable
 
         try
         {
-            _startupService.SetEnabled(enableStartup);
+            _runtime.SetStartupEnabled(enableStartup);
             return null;
         }
         catch (Exception exception) when (exception is IOException
@@ -284,6 +295,13 @@ internal sealed class AppController : IDisposable
         }
     }
 
+    /// <summary>
+    /// Resolves the desired tint state, clearing a manual override when the schedule changes state.
+    /// </summary>
+    /// <param name="manualOverride">The user's temporary tint state, or null to follow the schedule.</param>
+    /// <param name="lastScheduledState">The previous scheduled state, or null before the first evaluation.</param>
+    /// <param name="scheduledState">The newly evaluated scheduled state.</param>
+    /// <returns>The desired tint state and the manual override that remains in effect.</returns>
     public static (bool DesiredState, bool? ManualOverride) ResolveScheduleState(
         bool? manualOverride,
         bool? lastScheduledState,
@@ -313,6 +331,15 @@ internal sealed class AppController : IDisposable
         return Math.Clamp(elapsed / duration, 0, 1);
     }
 
+    /// <summary>
+    /// Linearly interpolates temperature and brightness for a fade.
+    /// </summary>
+    /// <param name="startKelvin">The starting color temperature in Kelvin.</param>
+    /// <param name="startBrightness">The starting brightness percentage.</param>
+    /// <param name="targetKelvin">The target color temperature in Kelvin.</param>
+    /// <param name="targetBrightness">The target brightness percentage.</param>
+    /// <param name="progress">The fade progress, clamped to the range from zero through one.</param>
+    /// <returns>The interpolated color temperature and brightness percentage.</returns>
     public static (double Kelvin, double Brightness) InterpolateGammaState(
         double startKelvin,
         double startBrightness,
@@ -344,7 +371,7 @@ internal sealed class AppController : IDisposable
                && Math.Abs(firstBrightness - secondBrightness) < GammaComparisonTolerance;
     }
 
-    private void Exit()
+    internal void Exit()
     {
         if (IsExiting)
         {
@@ -357,28 +384,26 @@ internal sealed class AppController : IDisposable
         _shutdown();
     }
 
-    private DispatcherTimer CreateTimer(TimeSpan interval, EventHandler handler)
+    internal void Toggle()
     {
-        var timer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher) { Interval = interval };
-        timer.Tick += handler;
-        return timer;
-    }
+        if (IsExiting)
+        {
+            return;
+        }
 
-    private void Toggle()
-    {
         _manualOverride = !_isOn;
         _previewing = false;
         SetTintState(_manualOverride.Value, true);
     }
 
-    private void UpdateSchedule(bool force)
+    internal void UpdateSchedule(bool force)
     {
         if (_previewing || IsExiting)
         {
             return;
         }
 
-        var scheduled = ScheduleService.ShouldBeOn(_settings, DateTime.Now);
+        var scheduled = ScheduleService.ShouldBeOn(_settings, _runtime.Now);
         var resolution = ResolveScheduleState(_manualOverride, _lastScheduledState, scheduled);
         _manualOverride = resolution.ManualOverride;
         _lastScheduledState = scheduled;
@@ -389,6 +414,41 @@ internal sealed class AppController : IDisposable
         else
         {
             UpdateTray();
+        }
+    }
+
+    internal void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Resume)
+        {
+            ScheduleDisplayReapply();
+        }
+    }
+
+    internal void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
+    {
+        if (e.Reason == SessionSwitchReason.SessionUnlock)
+        {
+            ScheduleDisplayReapply();
+        }
+    }
+
+    internal void OnSessionEnding(object sender, SessionEndingEventArgs e)
+    {
+        if (_runtime.CheckAccess())
+        {
+            ResetForSessionEnding();
+            return;
+        }
+
+        try
+        {
+            _runtime.Invoke(ResetForSessionEnding);
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or InvalidOperationException)
+        {
+            // The dispatcher is already shutting down, so restore the displays directly.
+            _gammaService.ResetAll();
         }
     }
 
@@ -411,13 +471,13 @@ internal sealed class AppController : IDisposable
         var startKelvin = _currentKelvin;
         var startBrightness = _currentBrightness;
         var fadeDuration = TimeSpan.FromMilliseconds(_settings.FadeMs);
-        var fadeStartedAt = Stopwatch.GetTimestamp();
+        var fadeStartedAt = _runtime.GetTimestamp();
 
-        _fadeTimer = CreateTimer(
+        _fadeTimer = _runtime.CreateTimer(
             TimeSpan.FromMilliseconds(FadeIntervalMilliseconds),
             (_, _) =>
             {
-                var progress = CalculateFadeProgress(Stopwatch.GetElapsedTime(fadeStartedAt), fadeDuration);
+                var progress = CalculateFadeProgress(_runtime.GetElapsedTime(fadeStartedAt), fadeDuration);
                 if (progress >= 1)
                 {
                     ApplyGamma(targetKelvin, targetBrightness);
@@ -482,13 +542,16 @@ internal sealed class AppController : IDisposable
             return;
         }
 
-#pragma warning disable VSTHRD001, VSTHRD110 // WPF dispatcher scheduling is intentionally fire-and-forget.
-        _dispatcher.BeginInvoke(() =>
+        _runtime.Post(() =>
         {
+            if (IsExiting)
+            {
+                return;
+            }
+
             _reapplyTimer.Stop();
             _reapplyTimer.Start();
         });
-#pragma warning restore VSTHRD001, VSTHRD110
     }
 
     private void ReapplyDisplays()
@@ -526,11 +589,13 @@ internal sealed class AppController : IDisposable
         }
 
         var state = _isOn ? $"Night Ember on - {_settings.Temperature}K" : "Night Ember off";
-        var next = ScheduleService.GetNextChange(_settings, DateTime.Now);
+        var next = ScheduleService.GetNextChange(_settings, _runtime.Now);
+
         var time = next?.ToString(
                        CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern,
                        CultureInfo.CurrentCulture)
                    ?? string.Empty;
+
         var verb = _isOn ? "off" : "on";
 
         string reason;
@@ -556,7 +621,7 @@ internal sealed class AppController : IDisposable
 
     private void ReportGammaError(string message)
     {
-        if (_tray is null || !_gammaErrorThrottle.ShouldAllow(message, DateTime.UtcNow))
+        if (_tray is null || !_gammaErrorThrottle.ShouldAllow(message, _runtime.UtcNow))
         {
             return;
         }
@@ -584,12 +649,12 @@ internal sealed class AppController : IDisposable
         {
             if (!_gammaService.Reset())
             {
-                GammaService.ResetAllDisplays();
+                _gammaService.ResetAll();
             }
         }
         catch (Exception exception) when (IsDisplayException(exception))
         {
-            GammaService.ResetAllDisplays();
+            _gammaService.ResetAll();
         }
         finally
         {
@@ -605,56 +670,26 @@ internal sealed class AppController : IDisposable
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.SessionEnding += OnSessionEnding;
+        _systemEventsSubscribed = true;
     }
 
     private void UnsubscribeSystemEvents()
     {
+        if (!_systemEventsSubscribed)
+        {
+            return;
+        }
+
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.SessionEnding -= OnSessionEnding;
+        _systemEventsSubscribed = false;
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
         ScheduleDisplayReapply();
-    }
-
-    private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
-    {
-        if (e.Mode == PowerModes.Resume)
-        {
-            ScheduleDisplayReapply();
-        }
-    }
-
-    private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
-    {
-        if (e.Reason == SessionSwitchReason.SessionUnlock)
-        {
-            ScheduleDisplayReapply();
-        }
-    }
-
-    private void OnSessionEnding(object sender, SessionEndingEventArgs e)
-    {
-        if (_dispatcher.CheckAccess())
-        {
-            ResetForSessionEnding();
-            return;
-        }
-
-#pragma warning disable VSTHRD001 // Session-ending cleanup must synchronously reach the WPF dispatcher.
-        try
-        {
-            _dispatcher.Invoke(ResetForSessionEnding);
-        }
-        catch (Exception exception) when (exception is OperationCanceledException or InvalidOperationException)
-        {
-            // The dispatcher is already shutting down, so restore the displays directly.
-            GammaService.ResetAllDisplays();
-        }
-#pragma warning restore VSTHRD001
     }
 
     private void ResetForSessionEnding()

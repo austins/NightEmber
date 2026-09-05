@@ -3,7 +3,6 @@
         <OutputType>WinExe</OutputType>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <UseWPF>true</UseWPF>
-        <UseWindowsForms>true</UseWindowsForms>
         <PublishSingleFile>true</PublishSingleFile>
         <AssemblyTitle>Night Ember</AssemblyTitle>
         <Product>Night Ember</Product>
@@ -12,6 +11,10 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
     </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1"/>
+    </ItemGroup>
 
     <ItemGroup>
         <InternalsVisibleTo Include="$(AssemblyName).Tests.Unit"/>

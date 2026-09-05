@@ -5,6 +5,13 @@
              MinWidth="70"
              Height="28"
              PreviewMouseWheel="NumericUpDown_PreviewMouseWheel">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="SpinnerStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
     <Border BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
             BorderThickness="1"
             Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">

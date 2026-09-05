@@ -1,6 +1,6 @@
-using NightEmber.Services;
+using NightEmber.Display;
 
-namespace NightEmber.Tests.Unit.Services;
+namespace NightEmber.Tests.Unit.Display;
 
 public sealed class GammaRampBuilderTests
 {

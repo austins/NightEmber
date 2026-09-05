@@ -1,6 +1,8 @@
+using NightEmber.Interop;
+using System.Drawing;
 using System.Drawing.Drawing2D;
 
-namespace NightEmber.Services;
+namespace NightEmber.TrayIcon;
 
 internal static class TrayIconFactory
 {
