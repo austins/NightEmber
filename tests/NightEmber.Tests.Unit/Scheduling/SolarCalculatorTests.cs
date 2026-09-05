@@ -1,6 +1,6 @@
-using NightEmber.Services;
+using NightEmber.Scheduling;
 
-namespace NightEmber.Tests.Unit.Services;
+namespace NightEmber.Tests.Unit.Scheduling;
 
 public sealed class SolarCalculatorTests
 {
@@ -102,10 +102,7 @@ public sealed class SolarCalculatorTests
     [InlineData(90, 12, 21)]
     [InlineData(-90, 6, 21)]
     [InlineData(-90, 12, 21)]
-    public void GetSunTimes_PolarDateWithoutHorizonCrossing_ReturnsNulls(
-        double latitude,
-        int month,
-        int day)
+    public void GetSunTimes_PolarDateWithoutHorizonCrossing_ReturnsNulls(double latitude, int month, int day)
     {
         // Act
         var result = SolarCalculator.GetSunTimes(
@@ -123,11 +120,7 @@ public sealed class SolarCalculatorTests
     {
         // Arrange
         var date = CalendarDate(2026, 4, 15);
-        var plusTwo = TimeZoneInfo.CreateCustomTimeZone(
-            "UTC+2",
-            TimeSpan.FromHours(2),
-            "UTC+2",
-            "UTC+2");
+        var plusTwo = TimeZoneInfo.CreateCustomTimeZone("UTC+2", TimeSpan.FromHours(2), "UTC+2", "UTC+2");
 
         // Act
         var utcResult = SolarCalculator.GetSunTimes(new SolarLocation(0, 0, "UTC"), date, TimeZoneInfo.Utc);
@@ -150,11 +143,7 @@ public sealed class SolarCalculatorTests
         // Arrange
         var date = CalendarDate(2026, 3, 20);
         var location = new SolarLocation(0, 0, "Test");
-        var plusFive = TimeZoneInfo.CreateCustomTimeZone(
-            "UTC+5",
-            TimeSpan.FromHours(5),
-            "UTC+5",
-            "UTC+5");
+        var plusFive = TimeZoneInfo.CreateCustomTimeZone("UTC+5", TimeSpan.FromHours(5), "UTC+5", "UTC+5");
 
         // Act
         var utcResult = SolarCalculator.GetSunTimes(location, date, TimeZoneInfo.Utc);
@@ -225,10 +214,7 @@ public sealed class SolarCalculatorTests
         var date = CalendarDate(2026, 1, 1);
 
         // Act
-        var result = SolarCalculator.GetSunTimes(
-            new SolarLocation(0, longitude, "Date line"),
-            date,
-            TimeZoneInfo.Utc);
+        var result = SolarCalculator.GetSunTimes(new SolarLocation(0, longitude, "Date line"), date, TimeZoneInfo.Utc);
 
         // Assert
         result.Sunrise.Should().NotBeNull();

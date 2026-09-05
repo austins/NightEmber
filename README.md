@@ -1,14 +1,14 @@
 # 🌙 Night Ember
 
-Night Ember is a portable night-light application for Windows. It applies a warm color temperature directly
-through each display's gamma ramp and runs quietly in the system tray.
+Night Ember is a portable night-light application for Windows. It applies a warm color temperature directly through each
+display's gamma ramp and runs quietly in the system tray.
 
-<img width="510" height="652" alt="Night Ember settings" src="https://github.com/user-attachments/assets/e335d852-0ae3-407b-9b8f-7be2e0cf1ffc" />
+<img width="512" height="760" alt="Night Ember settings" src="https://github.com/user-attachments/assets/b94e9c10-13b0-4064-8588-81a04fb1773a" />
 
 ## Features
 
 - Adjustable warmth from 6500 K down to 1200 K
-- Optional software dimming from 100% to 50%
+- Adjustable brightness from 100% (no dimming) down to 50%, using software dimming
 - Manual, sunset-to-sunrise, and custom-hour schedules
 - Offline sunrise and sunset estimates with no location permission or network access
 - Smooth, configurable transitions
@@ -16,6 +16,7 @@ through each display's gamma ramp and runs quietly in the system tray.
 - Automatic recovery after display changes, unlock, or resume
 - Gamma drift detection when another program resets a display
 - Tray toggle, settings window, and optional sign-in startup
+- Settings and tray-menu styling that follows the Windows light or dark app theme
 - Single-instance behavior
 - A cleanup watchdog that restores neutral gamma after an unexpected process exit
 - Portable settings stored beside the executable
@@ -27,8 +28,8 @@ through each display's gamma ramp and runs quietly in the system tray.
 3. Adjust the settings and select **Save**.
 4. Use the crescent moon in the system tray to toggle the effect, reopen settings, or exit.
 
-Warmth and software-dimming changes are previewed immediately and remain active while the settings window is open.
-Select **Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray toggle
+Warmth and brightness changes are previewed immediately and remain active while the settings window is open. Select
+**Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray toggle
 while the window is open ends the preview and applies a manual override.
 
 Closing the settings window leaves Night Ember running in the tray. Choose **Exit**
@@ -37,18 +38,51 @@ from the tray menu to stop the application and restore neutral display gamma.
 A manual tray toggle temporarily overrides an active schedule. The override expires when the schedule next changes
 naturally.
 
+## Keyboard access
+
+The settings window starts with focus on Strength. Use **Tab** and **Shift+Tab** to move through settings and the
+Save/Cancel buttons. Only the selected schedule option is a tab stop; use the arrow keys to select another schedule.
+Disabled custom-time fields are skipped.
+
+| Shortcut              | Action                                          |
+|-----------------------|-------------------------------------------------|
+| Alt+G / Alt+B         | Focus Strength / Brightness                     |
+| Alt+N / Alt+U / Alt+H | Select manual / sunset / custom-hour scheduling |
+| Alt+O / Alt+F         | Focus the custom turn-on / turn-off time        |
+| Alt+T                 | Focus transition duration                       |
+| Alt+A                 | Toggle start at sign-in                         |
+| Alt+S / Alt+C         | Save / Cancel                                   |
+
+In time fields, **Left/Right** selects the hour, minute, or AM/PM segment and **Up/Down** adjusts it. In the transition
+field, **Up/Down** adjusts the duration by 50 milliseconds. Modified arrow keys retain normal text-editing behavior.
+While typing a time, **Left/Right** moves the caret so you can correct the text; committing a valid edit restores
+segment navigation. Inside these fields, **Enter** commits the edit and **Escape** restores it; use **Alt+S** or
+**Alt+C** to save or cancel the whole window. Elsewhere, Enter and Escape activate the default Save and Cancel actions
+when not consumed by a control.
+
+Invalid times and transition durations stay visible when you press Enter or leave the field. A themed error outline and
+inline message explain what needs correcting; Save keeps the window open and focuses the first invalid input. Correct
+the text or press Escape in the field to restore its last accepted value. Transition durations must be whole numbers
+from 0 to 5000 ms. Custom turn-on/off times must differ; unused custom-time fields do not block saving manual or sunset
+schedules.
+
+For the tray icon, press **Win+B**, then use the arrow keys to select Night Ember (open the hidden-icons area if
+needed). **Enter** opens settings; **Shift+F10** or the context-menu key opens its menu. In the menu, use **Up/Down**
+and **Enter**, or press **T** to toggle the tint, **S** for settings, and **X** to exit. **Escape** dismisses the menu
+and returns focus to the notification area.
+
 ## Portable settings
 
 Settings are saved as `NightEmber.config.json` beside `NightEmber.exe`:
 
-| Setting       | Range                        | Default  | Purpose                         |
-|---------------|------------------------------|----------|---------------------------------|
-| `Temperature` | 1200-6500                    | `3400`   | Color temperature while enabled |
-| `Brightness`  | 50-100                       | `100`    | Software dimming percentage     |
-| `Mode`        | `Manual`, `Sunset`, `Custom` | `Sunset` | Scheduling mode                 |
-| `CustomOn`    | `HH:mm`                      | `21:00`  | Custom schedule start           |
-| `CustomOff`   | `HH:mm`                      | `07:00`  | Custom schedule end             |
-| `FadeMs`      | 0-5000                       | `300`    | Transition duration             |
+| Setting       | Range                        | Default  | Purpose                                   |
+|---------------|------------------------------|----------|-------------------------------------------|
+| `Temperature` | 1200-6500                    | `3400`   | Color temperature while enabled           |
+| `Brightness`  | 50-100                       | `100`    | Brightness percentage (100% = no dimming) |
+| `Mode`        | `Manual`, `Sunset`, `Custom` | `Sunset` | Scheduling mode                           |
+| `CustomOn`    | `HH:mm`                      | `21:00`  | Custom schedule start                     |
+| `CustomOff`   | `HH:mm`                      | `07:00`  | Custom schedule end                       |
+| `FadeMs`      | 0-5000                       | `300`    | Transition duration                       |
 
 The executable must be in a folder the current user can write to. A folder under the user profile is recommended;
 protected folders such as `Program Files` prevent the portable configuration from being saved.

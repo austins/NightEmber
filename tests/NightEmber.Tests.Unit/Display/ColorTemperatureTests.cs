@@ -1,6 +1,6 @@
-using NightEmber.Services;
+using NightEmber.Display;
 
-namespace NightEmber.Tests.Unit.Services;
+namespace NightEmber.Tests.Unit.Display;
 
 public sealed class ColorTemperatureTests
 {
@@ -10,11 +10,7 @@ public sealed class ColorTemperatureTests
     [InlineData(6500, 1, 0.9965101328, 0.9805565033)]
     [InlineData(6600, 1, 1, 1)]
     [InlineData(40000, 0.5948014943, 0.7275657511, 1)]
-    public void ToRgb_KnownTemperature_ReturnsExpectedMultipliers(
-        double kelvin,
-        double red,
-        double green,
-        double blue)
+    public void ToRgb_KnownTemperature_ReturnsExpectedMultipliers(double kelvin, double red, double green, double blue)
     {
         // Act
         var result = ColorTemperature.ToRgb(kelvin);

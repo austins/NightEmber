@@ -12,7 +12,9 @@ public sealed class AppSettingsTests
         var second = AppSettings.Default;
 
         // Assert
-        first.Should().BeEquivalentTo(
+        first
+        .Should()
+        .BeEquivalentTo(
             new AppSettings
             {
                 Temperature = 3400,
@@ -22,6 +24,7 @@ public sealed class AppSettingsTests
                 CustomOff = "07:00",
                 FadeMs = 300
             });
+
         first.Should().NotBeSameAs(second);
     }
 

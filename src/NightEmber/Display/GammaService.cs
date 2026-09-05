@@ -1,11 +1,9 @@
-using System.Runtime.InteropServices;
-
-namespace NightEmber.Services;
+namespace NightEmber.Display;
 
 /// <summary>
 /// Owns display device contexts and applies GDI gamma ramps to every active monitor.
 /// </summary>
-internal sealed class GammaService : IDisposable
+internal sealed class GammaService : IGammaService
 {
     private const int PercentageScale = 100;
     private const int RampMidpointIndex = GammaRampBuilder.RampLength / 2;
@@ -15,6 +13,7 @@ internal sealed class GammaService : IDisposable
     private const int DriftTolerance = 256;
 
     private readonly List<DisplayContext> _displays = [];
+    private readonly IGammaDeviceApi _devices;
     private readonly ushort[] _rampBuffer = new ushort[GammaRampBuilder.RampElementCount];
     private readonly ushort[] _readbackBuffer = new ushort[GammaRampBuilder.RampElementCount];
     private ushort? _expectedBlue;
@@ -22,7 +21,19 @@ internal sealed class GammaService : IDisposable
     private double _lastBrightness = 100;
     private bool _disposed;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Initializes a gamma service backed by the native Windows display APIs.
+    /// </summary>
+    public GammaService()
+        : this(new GammaDeviceApi())
+    {
+    }
+
+    internal GammaService(IGammaDeviceApi devices)
+    {
+        _devices = devices;
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -34,24 +45,18 @@ internal sealed class GammaService : IDisposable
         _disposed = true;
     }
 
-    /// <summary>
-    /// Rebuilds the device-context collection from the currently connected displays.
-    /// </summary>
-    /// <exception cref="System.ComponentModel.Win32Exception">
-    /// Thrown when Windows provides no usable display device contexts.
-    /// </exception>
     public void OpenDisplays()
     {
         ThrowIfDisposed();
         CloseDisplays();
 
         var lastError = 0;
-        foreach (var deviceName in Screen.AllScreens.Select(static screen => screen.DeviceName))
+        foreach (var deviceName in _devices.GetDeviceNames())
         {
-            var deviceContext = NativeMethods.CreateDc("DISPLAY", deviceName, null, 0);
+            var deviceContext = _devices.Open(deviceName);
             if (deviceContext == 0)
             {
-                lastError = Marshal.GetLastPInvokeError();
+                lastError = _devices.GetLastError();
                 continue;
             }
 
@@ -67,16 +72,6 @@ internal sealed class GammaService : IDisposable
         }
     }
 
-    /// <summary>
-    /// Applies a color temperature and software brightness to every display.
-    /// </summary>
-    /// <param name="kelvin">The requested color temperature in Kelvin.</param>
-    /// <param name="brightnessPercent">The requested software brightness percentage.</param>
-    /// <returns><see langword="true" /> when every display accepted the ramp.</returns>
-    /// <remarks>
-    /// Stale display handles are rebuilt and retried once. Windows rejects ramps
-    /// below half of linear, so generated channel multipliers are clamped to that floor.
-    /// </remarks>
     public bool Apply(double kelvin, double brightnessPercent)
     {
         ThrowIfDisposed();
@@ -103,10 +98,6 @@ internal sealed class GammaService : IDisposable
         return applied;
     }
 
-    /// <summary>
-    /// Applies an identity ramp to every tracked display.
-    /// </summary>
-    /// <returns><see langword="true" /> when every display accepted the reset.</returns>
     public bool Reset()
     {
         ThrowIfDisposed();
@@ -122,13 +113,6 @@ internal sealed class GammaService : IDisposable
         return applied;
     }
 
-    /// <summary>
-    /// Detects whether another component replaced the active ramp and reapplies it.
-    /// </summary>
-    /// <remarks>
-    /// Only the midpoint of the blue channel is read because a reset changes it by
-    /// thousands of units while ordinary driver rounding differs by only a few.
-    /// </remarks>
     public void RepairDrift()
     {
         ThrowIfDisposed();
@@ -139,7 +123,7 @@ internal sealed class GammaService : IDisposable
 
         foreach (var display in _displays)
         {
-            if (!NativeMethods.GetDeviceGammaRamp(display.Handle, _readbackBuffer))
+            if (!_devices.Read(display.Handle, _readbackBuffer))
             {
                 continue;
             }
@@ -162,10 +146,31 @@ internal sealed class GammaService : IDisposable
     /// </remarks>
     public static void ResetAllDisplays()
     {
+        ResetAllDisplays(new GammaDeviceApi());
+    }
+
+    /// <summary>
+    /// Determines whether a blue-channel midpoint differs by more than the drift tolerance.
+    /// </summary>
+    /// <param name="expected">The midpoint of the last successfully applied ramp.</param>
+    /// <param name="actual">The midpoint read from the display.</param>
+    /// <returns><see langword="true" /> when the absolute difference exceeds 256 ramp units.</returns>
+    public static bool HasDrifted(ushort expected, ushort actual)
+    {
+        return Math.Abs(actual - expected) > DriftTolerance;
+    }
+
+    void IGammaService.ResetAll()
+    {
+        ResetAllDisplays(_devices);
+    }
+
+    internal static void ResetAllDisplays(IGammaDeviceApi devices)
+    {
         var ramp = GammaRampBuilder.Build(1, 1, 1, 1, false);
-        foreach (var deviceName in Screen.AllScreens.Select(static screen => screen.DeviceName))
+        foreach (var deviceName in devices.GetDeviceNames())
         {
-            var deviceContext = NativeMethods.CreateDc("DISPLAY", deviceName, null, 0);
+            var deviceContext = devices.Open(deviceName);
             if (deviceContext == 0)
             {
                 continue;
@@ -175,19 +180,14 @@ internal sealed class GammaService : IDisposable
             {
                 // Some display drivers intermittently ignore the first identity ramp,
                 // so the watchdog recovery path repeats the reset once.
-                NativeMethods.SetDeviceGammaRamp(deviceContext, ramp);
-                NativeMethods.SetDeviceGammaRamp(deviceContext, ramp);
+                devices.Write(deviceContext, ramp);
+                devices.Write(deviceContext, ramp);
             }
             finally
             {
-                NativeMethods.DeleteDc(deviceContext);
+                devices.Close(deviceContext);
             }
         }
-    }
-
-    public static bool HasDrifted(ushort expected, ushort actual)
-    {
-        return Math.Abs(actual - expected) > DriftTolerance;
     }
 
     private void EnsureDisplays()
@@ -203,10 +203,10 @@ internal sealed class GammaService : IDisposable
         var allApplied = _displays.Count > 0;
         foreach (var displayHandle in _displays.Select(static display => display.Handle))
         {
-            var result = NativeMethods.SetDeviceGammaRamp(displayHandle, ramp);
+            var result = _devices.Write(displayHandle, ramp);
             if (!result)
             {
-                result = NativeMethods.SetDeviceGammaRamp(displayHandle, ramp);
+                result = _devices.Write(displayHandle, ramp);
             }
 
             allApplied &= result;
@@ -226,7 +226,7 @@ internal sealed class GammaService : IDisposable
     {
         foreach (var display in _displays)
         {
-            NativeMethods.DeleteDc(display.Handle);
+            _devices.Close(display.Handle);
         }
 
         _displays.Clear();
@@ -238,4 +238,54 @@ internal sealed class GammaService : IDisposable
     }
 
     private sealed record DisplayContext(nint Handle);
+}
+
+/// <summary>
+/// Manages display gamma ramps, drift repair, and recovery to a neutral display state.
+/// </summary>
+internal interface IGammaService : IDisposable
+{
+    /// <summary>
+    /// Rebuilds the device-context collection from the currently connected displays.
+    /// </summary>
+    /// <exception cref="System.ComponentModel.Win32Exception">
+    /// Thrown when Windows provides no usable display device contexts.
+    /// </exception>
+    public void OpenDisplays();
+
+    /// <summary>
+    /// Applies a color temperature and software brightness to every display.
+    /// </summary>
+    /// <param name="kelvin">The requested color temperature in Kelvin.</param>
+    /// <param name="brightnessPercent">The requested software brightness percentage.</param>
+    /// <returns><see langword="true" /> when every display accepted the ramp.</returns>
+    /// <remarks>
+    /// Stale display handles are rebuilt and retried once. Generated channel multipliers
+    /// are clamped to a driver-safe floor of half of linear.
+    /// </remarks>
+    public bool Apply(double kelvin, double brightnessPercent);
+
+    /// <summary>
+    /// Applies an identity ramp to every tracked display.
+    /// </summary>
+    /// <returns><see langword="true" /> when every display accepted the reset.</returns>
+    public bool Reset();
+
+    /// <summary>
+    /// Detects whether another component replaced the active ramp and reapplies it.
+    /// </summary>
+    /// <remarks>
+    /// Only the midpoint of the blue channel is read because a reset changes it by
+    /// thousands of units while ordinary driver rounding differs by only a few.
+    /// </remarks>
+    public void RepairDrift();
+
+    /// <summary>
+    /// Opens each current display independently and attempts to restore an identity ramp.
+    /// </summary>
+    /// <remarks>
+    /// Recovery does not depend on tracked display handles. It writes the identity ramp
+    /// twice per usable display and releases each newly opened handle afterward.
+    /// </remarks>
+    public void ResetAll();
 }

@@ -19,6 +19,10 @@ internal sealed class SettingsService
     {
     }
 
+    /// <summary>
+    /// Initializes a settings store at the supplied configuration path.
+    /// </summary>
+    /// <param name="configPath">The path used to load and save the portable JSON configuration.</param>
     public SettingsService(string configPath)
     {
         ConfigPath = configPath;
@@ -60,26 +64,26 @@ internal sealed class SettingsService
 
             return new SettingsLoadResult(settings.Normalize(), false, null);
         }
-        catch (JsonException exception)
+        catch (JsonException ex)
         {
             return new SettingsLoadResult(
                 AppSettings.Default,
                 false,
-                $"The settings file is invalid. Safe defaults have been loaded.\n\n{exception.Message}");
+                $"The settings file is invalid. Safe defaults have been loaded.\n\n{ex.Message}");
         }
-        catch (IOException exception)
+        catch (IOException ex)
         {
             return new SettingsLoadResult(
                 AppSettings.Default,
                 false,
-                $"The settings file could not be read. Safe defaults have been loaded.\n\n{exception.Message}");
+                $"The settings file could not be read. Safe defaults have been loaded.\n\n{ex.Message}");
         }
-        catch (UnauthorizedAccessException exception)
+        catch (UnauthorizedAccessException ex)
         {
             return new SettingsLoadResult(
                 AppSettings.Default,
                 false,
-                $"The settings file could not be accessed. Safe defaults have been loaded.\n\n{exception.Message}");
+                $"The settings file could not be accessed. Safe defaults have been loaded.\n\n{ex.Message}");
         }
     }
 

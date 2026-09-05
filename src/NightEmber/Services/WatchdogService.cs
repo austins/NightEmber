@@ -1,4 +1,5 @@
 using Microsoft.Win32.SafeHandles;
+using NightEmber.Display;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -17,7 +18,6 @@ internal sealed class WatchdogService : IDisposable
     private Process? _watchdogProcess;
     private bool _disposed;
 
-    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)
@@ -45,7 +45,9 @@ internal sealed class WatchdogService : IDisposable
     /// </summary>
     /// <remarks>
     /// The child receives the main process ID and a randomly named event. It does
-    /// not initialize WPF UI or application services.
+    /// not create a settings window, tray icon, or controller. The shared WPF
+    /// application entry point still initializes application resources before
+    /// dispatching to watchdog mode.
     /// </remarks>
     public void Start()
     {
@@ -126,32 +128,47 @@ internal sealed class WatchdogService : IDisposable
     {
         using var orderlyExitEvent = EventWaitHandle.OpenExisting(eventName);
 
-        try
-        {
-            using var parent = Process.GetProcessById(processId);
-            using ProcessWaitHandle parentExit = new(parent);
-            WaitHandle[] handles = [orderlyExitEvent, parentExit];
-
-            var signaledHandle = WaitHandle.WaitAny(handles);
-            if (signaledHandle == 1 && !orderlyExitEvent.WaitOne(0))
+        Run(
+            () =>
             {
-                GammaService.ResetAllDisplays();
-            }
-        }
-        catch (Exception exception) when (IsProcessMonitoringException(exception))
-        {
-            // The parent may exit between lookup and handle acquisition. If it did
-            // not report an orderly exit, recover the display state immediately.
-            if (!orderlyExitEvent.WaitOne(0))
-            {
-                GammaService.ResetAllDisplays();
-            }
-        }
+                using var parent = Process.GetProcessById(processId);
+                using ProcessWaitHandle parentExit = new(parent);
+                WaitHandle[] handles = [orderlyExitEvent, parentExit];
+                return WaitHandle.WaitAny(handles);
+            },
+            () => orderlyExitEvent.WaitOne(0),
+            GammaService.ResetAllDisplays);
     }
 
+    /// <summary>
+    /// Identifies process lookup and monitoring failures that trigger the watchdog's recovery path.
+    /// </summary>
+    /// <param name="exception">The failure to classify.</param>
+    /// <returns><see langword="true" /> for argument, invalid-operation, or native Windows failures.</returns>
     public static bool IsProcessMonitoringException(Exception exception)
     {
         return exception is ArgumentException or InvalidOperationException or Win32Exception;
+    }
+
+    internal static void Run(Func<int> waitForExit, Func<bool> isOrderlyExit, Action resetDisplays)
+    {
+        try
+        {
+            var signaledHandle = waitForExit();
+            if (signaledHandle == 1 && !isOrderlyExit())
+            {
+                resetDisplays();
+            }
+        }
+        catch (Exception ex) when (IsProcessMonitoringException(ex))
+        {
+            // The parent may exit between lookup and handle acquisition. If it did
+            // not report an orderly exit, recover the display state immediately.
+            if (!isOrderlyExit())
+            {
+                resetDisplays();
+            }
+        }
     }
 
     private sealed class ProcessWaitHandle : WaitHandle

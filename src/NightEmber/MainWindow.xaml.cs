@@ -1,8 +1,13 @@
+using NightEmber.Controls;
 using NightEmber.Models;
 using NightEmber.Services;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 
 namespace NightEmber;
 
@@ -20,8 +25,8 @@ public sealed partial class MainWindow : Window
     private readonly bool _initialized;
     private readonly AppController _controller;
     private int _originalTemperature;
-    private int _originalStrength;
     private bool _saved;
+    private bool _showScheduleValidation;
 
     /// <summary>
     /// Initializes the settings window from the active application state.
@@ -63,14 +68,37 @@ public sealed partial class MainWindow : Window
     /// </remarks>
     internal static bool IsCustomWindowValid(bool isCustomMode, TimeSpan on, TimeSpan off)
     {
-        return !isCustomMode || on != off;
+        return !isCustomMode || AppSettings.FormatTime(on) != AppSettings.FormatTime(off);
+    }
+
+    internal static AppSettings BuildSettings(
+        int originalTemperature,
+        double strength,
+        double brightness,
+        ScheduleMode mode,
+        TimeSpan customOn,
+        TimeSpan customOff,
+        int fadeMilliseconds)
+    {
+        var roundedStrength = (int)Math.Round(strength);
+        return new AppSettings
+        {
+            Temperature =
+                roundedStrength == TemperatureToStrength(originalTemperature)
+                    ? originalTemperature
+                    : StrengthToTemperature(roundedStrength),
+            Brightness = (int)Math.Round(brightness),
+            Mode = mode,
+            CustomOn = AppSettings.FormatTime(customOn),
+            CustomOff = AppSettings.FormatTime(customOff),
+            FadeMs = fadeMilliseconds
+        };
     }
 
     private void LoadSettings(AppSettings settings)
     {
         StrengthSlider.Value = TemperatureToStrength(settings.Temperature);
         _originalTemperature = settings.Temperature;
-        _originalStrength = (int)Math.Round(StrengthSlider.Value);
         BrightnessSlider.Value = settings.Brightness;
 
         ManualModeRadio.IsChecked = settings.Mode == ScheduleMode.Manual;
@@ -122,44 +150,51 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void ScheduleOptions_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.KeyboardDevice.Modifiers != ModifierKeys.None || e.OriginalSource is not RadioButton current)
+        {
+            return;
+        }
+
+        var direction = e.Key switch
+        {
+            Key.Up => -1,
+            Key.Down => 1,
+            Key.Left => FlowDirection == FlowDirection.RightToLeft ? 1 : -1,
+            Key.Right => FlowDirection == FlowDirection.RightToLeft ? -1 : 1,
+            _ => 0
+        };
+
+        if (direction == 0)
+        {
+            return;
+        }
+
+        RadioButton[] options = [ManualModeRadio, SunsetModeRadio, CustomModeRadio];
+        var index = Array.IndexOf(options, current);
+        var next = options[(index + direction + options.Length) % options.Length];
+        next.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+        next.Focus();
+        e.Handled = true;
+    }
+
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!CustomOnInput.CommitEdit() || !CustomOffInput.CommitEdit())
+        if (!ValidateInputs())
         {
-            System.Windows.MessageBox.Show(
-                $"Enter both times using your Windows time format, for example "
-                + $"{DateTime.Today.AddHours(21).ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture)}.",
-                "Night Ember",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
             return;
         }
 
-        FadeDurationInput.CommitEdit();
-
-        if (!IsCustomWindowValid(CustomModeRadio.IsChecked == true, CustomOnInput.TimeValue, CustomOffInput.TimeValue))
-        {
-            System.Windows.MessageBox.Show(
-                "Set different turn-on and turn-off times. Night Ember never changes state when both times match.",
-                "Night Ember",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        var settings = new AppSettings
-        {
-            Temperature =
-                (int)Math.Round(StrengthSlider.Value) == _originalStrength
-                    ? _originalTemperature
-                    : StrengthToTemperature((int)Math.Round(StrengthSlider.Value)),
-            Brightness = (int)Math.Round(BrightnessSlider.Value),
-            Mode = SunsetModeRadio.IsChecked == true ? ScheduleMode.Sunset :
-                CustomModeRadio.IsChecked == true ? ScheduleMode.Custom : ScheduleMode.Manual,
-            CustomOn = AppSettings.FormatTime(CustomOnInput.TimeValue),
-            CustomOff = AppSettings.FormatTime(CustomOffInput.TimeValue),
-            FadeMs = FadeDurationInput.NumericValue
-        };
+        var settings = BuildSettings(
+            _originalTemperature,
+            StrengthSlider.Value,
+            BrightnessSlider.Value,
+            SunsetModeRadio.IsChecked == true ? ScheduleMode.Sunset :
+            CustomModeRadio.IsChecked == true ? ScheduleMode.Custom : ScheduleMode.Manual,
+            CustomOnInput.TimeValue,
+            CustomOffInput.TimeValue,
+            FadeDurationInput.NumericValue);
 
         try
         {
@@ -168,15 +203,15 @@ public sealed partial class MainWindow : Window
             Close();
             if (warning is not null)
             {
-                System.Windows.MessageBox.Show(warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
-        catch (Exception exception) when (exception is IOException
-                                              or UnauthorizedAccessException
-                                              or System.Security.SecurityException)
+        catch (Exception ex) when (ex is IOException
+                                       or UnauthorizedAccessException
+                                       or System.Security.SecurityException)
         {
-            System.Windows.MessageBox.Show(
-                $"The settings could not be saved.\n\n{exception.Message}",
+            MessageBox.Show(
+                $"The settings could not be saved.\n\n{ex.Message}",
                 "Night Ember",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
@@ -208,5 +243,54 @@ public sealed partial class MainWindow : Window
     private void UpdateScheduleControls()
     {
         CustomTimePanel.IsEnabled = CustomModeRadio.IsChecked == true;
+        UpdateScheduleValidation();
+    }
+
+    private bool ValidateInputs()
+    {
+        _showScheduleValidation = true;
+        var custom = CustomModeRadio.IsChecked == true;
+        var onValid = !custom || CustomOnInput.CommitEdit();
+        var offValid = !custom || CustomOffInput.CommitEdit();
+        var durationValid = FadeDurationInput.CommitEdit();
+        UpdateScheduleValidation();
+
+        UserControl? invalidInput = !onValid ? CustomOnInput :
+            !offValid || ScheduleErrorText.Text.Length > 0 ? CustomOffInput :
+            !durationValid ? FadeDurationInput : null;
+        if (invalidInput is null)
+        {
+            return true;
+        }
+
+        InputValidation.FocusEditor(invalidInput);
+        return false;
+    }
+
+    private void ScheduleTimes_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_initialized)
+        {
+            UpdateScheduleValidation();
+        }
+    }
+
+    private void UpdateScheduleValidation()
+    {
+        var invalid = _showScheduleValidation
+                      && CustomModeRadio.IsChecked == true
+                      && CustomOnInput.TryGetEditedTime(out var on)
+                      && CustomOffInput.TryGetEditedTime(out var off)
+                      && !IsCustomWindowValid(true, on, off);
+        var message = invalid
+            ? "Set different turn-on and turn-off times. Matching times would never turn Night Ember on."
+            : string.Empty;
+        if (ScheduleErrorText.Text != message)
+        {
+            ScheduleErrorText.Text = message;
+            UIElementAutomationPeer
+                .FromElement(ScheduleErrorText)
+                ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+        }
     }
 }

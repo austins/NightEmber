@@ -1,4 +1,4 @@
-namespace NightEmber.Services;
+namespace NightEmber.Scheduling;
 
 /// <summary>
 /// Calculates local sunrise and sunset times using an offline solar algorithm.
@@ -123,6 +123,13 @@ internal static class SolarCalculator
         return GetSunTimes(location, date, TimeZoneInfo.Local);
     }
 
+    /// <summary>
+    /// Calculates sunrise and sunset for a location and calendar date in an explicit time zone.
+    /// </summary>
+    /// <param name="location">The coordinates used for the calculation.</param>
+    /// <param name="date">The calendar date in the supplied time zone.</param>
+    /// <param name="timeZone">The time zone used to express the calculated event times.</param>
+    /// <returns>Sunrise and sunset values, with null for any event where the sun does not cross the horizon.</returns>
     public static SunTimes GetSunTimes(SolarLocation location, DateTime date, TimeZoneInfo timeZone)
     {
         var sunrise = GetTime(location, date, SunriseBaseHour, true, timeZone);
@@ -131,6 +138,12 @@ internal static class SolarCalculator
         return new SunTimes(sunrise, sunset);
     }
 
+    /// <summary>
+    /// Produces an approximate location from a time zone's representative latitude and standard UTC offset.
+    /// </summary>
+    /// <param name="timeZone">The time zone whose location should be estimated.</param>
+    /// <returns>The representative latitude, derived longitude, and source label.</returns>
+    /// <remarks>Unrecognized time zones use latitude zero and are labeled as equatorial estimates.</remarks>
     public static SolarLocation GetTimeZoneLocation(TimeZoneInfo timeZone)
     {
         var longitude = Math.Clamp(

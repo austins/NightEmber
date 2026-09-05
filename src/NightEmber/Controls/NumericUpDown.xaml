@@ -4,10 +4,18 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              MinWidth="70"
              Height="28"
+             Focusable="False"
+             IsTabStop="False"
+             KeyboardNavigation.TabNavigation="Once"
              PreviewMouseWheel="NumericUpDown_PreviewMouseWheel">
-    <Border BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
-            BorderThickness="1"
-            Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="SpinnerStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Border Style="{StaticResource SpinnerBorderStyle}">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -15,13 +23,12 @@
             </Grid.ColumnDefinitions>
 
             <TextBox x:Name="ValueTextBox"
-                     BorderThickness="0"
-                     Padding="5,0,4,0"
+                     Style="{StaticResource SpinnerTextBoxStyle}"
                      HorizontalContentAlignment="Right"
-                     VerticalContentAlignment="Center"
                      AutomationProperties.LabeledBy="{Binding Path=(AutomationProperties.LabeledBy), ElementName=Root}"
+                     AutomationProperties.AcceleratorKey="{Binding Path=(AutomationProperties.AcceleratorKey), ElementName=Root}"
                      AutomationProperties.HelpText="{Binding Path=(AutomationProperties.HelpText), ElementName=Root}"
-                     PreviewTextInput="ValueTextBox_PreviewTextInput"
+                     TextChanged="ValueTextBox_TextChanged"
                      PreviewKeyDown="ValueTextBox_PreviewKeyDown"
                      LostKeyboardFocus="ValueTextBox_LostKeyboardFocus" />
 

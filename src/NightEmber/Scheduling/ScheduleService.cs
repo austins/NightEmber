@@ -1,6 +1,6 @@
 using NightEmber.Models;
 
-namespace NightEmber.Services;
+namespace NightEmber.Scheduling;
 
 /// <summary>
 /// Evaluates schedule state and computes upcoming schedule boundaries.
@@ -18,6 +18,14 @@ internal static class ScheduleService
         return ShouldBeOn(settings, now, SolarCalculator.GetLocalTimeZoneLocation(), TimeZoneInfo.Local);
     }
 
+    /// <summary>
+    /// Determines whether the tint should be active using an explicit solar location and time zone.
+    /// </summary>
+    /// <param name="settings">The schedule settings to evaluate.</param>
+    /// <param name="now">The date and time in the supplied time zone.</param>
+    /// <param name="location">The coordinates used for sunrise and sunset calculations.</param>
+    /// <param name="timeZone">The time zone used to express solar event times.</param>
+    /// <returns><see langword="true" /> when the configured schedule is active.</returns>
     public static bool ShouldBeOn(AppSettings settings, DateTime now, SolarLocation location, TimeZoneInfo timeZone)
     {
         return settings.Mode switch
@@ -40,6 +48,14 @@ internal static class ScheduleService
         return GetNextChange(settings, now, SolarCalculator.GetLocalTimeZoneLocation(), TimeZoneInfo.Local);
     }
 
+    /// <summary>
+    /// Finds the next schedule boundary using an explicit solar location and time zone.
+    /// </summary>
+    /// <param name="settings">The schedule settings to evaluate.</param>
+    /// <param name="now">The current date and time in the supplied time zone.</param>
+    /// <param name="location">The coordinates used for sunrise and sunset calculations.</param>
+    /// <param name="timeZone">The time zone used to express solar event times.</param>
+    /// <returns>The next boundary, or <see langword="null" /> when no boundary exists.</returns>
     public static DateTime? GetNextChange(
         AppSettings settings,
         DateTime now,

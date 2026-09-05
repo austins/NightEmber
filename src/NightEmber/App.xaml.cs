@@ -1,3 +1,4 @@
+using NightEmber.Display;
 using NightEmber.Services;
 using System.Windows;
 
@@ -6,13 +7,12 @@ namespace NightEmber;
 /// <summary>
 /// Provides the Night Ember application entry point and lifecycle coordination.
 /// </summary>
-public sealed partial class App : System.Windows.Application, IDisposable
+public sealed partial class App : Application, IDisposable
 {
     private SingleInstanceService? _singleInstance;
     private WatchdogService? _watchdog;
     private AppController? _controller;
 
-    /// <inheritdoc />
     public void Dispose()
     {
         _controller?.Dispose();
@@ -26,7 +26,6 @@ public sealed partial class App : System.Windows.Application, IDisposable
         _singleInstance = null;
     }
 
-    /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -72,19 +71,16 @@ public sealed partial class App : System.Windows.Application, IDisposable
             return;
         }
 
-        System.Windows.Forms.Application.EnableVisualStyles();
-
         _watchdog?.Dispose();
         _watchdog = new WatchdogService();
         try
         {
             _watchdog.Start();
         }
-        catch (Exception exception) when
-            (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            System.Windows.MessageBox.Show(
-                $"Night Ember could not start its display cleanup watchdog.\n\n{exception.Message}",
+            MessageBox.Show(
+                $"Night Ember could not start its display cleanup watchdog.\n\n{ex.Message}",
                 "Night Ember",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
@@ -101,7 +97,6 @@ public sealed partial class App : System.Windows.Application, IDisposable
         controller.Initialize(hidden);
     }
 
-    /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
         Dispose();

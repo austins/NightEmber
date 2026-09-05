@@ -1,7 +1,7 @@
 using NightEmber.Models;
-using NightEmber.Services;
+using NightEmber.Scheduling;
 
-namespace NightEmber.Tests.Unit.Services;
+namespace NightEmber.Tests.Unit.Scheduling;
 
 public sealed class ScheduleServiceTests
 {
@@ -47,10 +47,7 @@ public sealed class ScheduleServiceTests
     [InlineData(6, 59, true)]
     [InlineData(7, 0, false)]
     [InlineData(12, 0, false)]
-    public void ShouldBeOn_OvernightCustomWindow_UsesInclusiveStartExclusiveEnd(
-        int hour,
-        int minute,
-        bool expected)
+    public void ShouldBeOn_OvernightCustomWindow_UsesInclusiveStartExclusiveEnd(int hour, int minute, bool expected)
     {
         // Arrange
         var settings = CustomSettings("21:00", "07:00");
@@ -69,10 +66,7 @@ public sealed class ScheduleServiceTests
     [InlineData(11, 59, true)]
     [InlineData(12, 0, false)]
     [InlineData(20, 0, false)]
-    public void ShouldBeOn_SameDayCustomWindow_UsesInclusiveStartExclusiveEnd(
-        int hour,
-        int minute,
-        bool expected)
+    public void ShouldBeOn_SameDayCustomWindow_UsesInclusiveStartExclusiveEnd(int hour, int minute, bool expected)
     {
         // Arrange
         var settings = CustomSettings("08:00", "12:00");
@@ -120,10 +114,7 @@ public sealed class ScheduleServiceTests
         // Arrange
         var settings = CustomSettings("21:00", "07:00");
         var now = LocalDateTime(2026, 4, 10, nowHour, nowMinute);
-        var expected = now.Date
-            .AddDays(expectedDayOffset)
-            .AddHours(expectedHour)
-            .AddMinutes(expectedMinute);
+        var expected = now.Date.AddDays(expectedDayOffset).AddHours(expectedHour).AddMinutes(expectedMinute);
 
         // Act
         var next = ScheduleService.GetNextChange(settings, now);
@@ -148,10 +139,7 @@ public sealed class ScheduleServiceTests
         // Arrange
         var settings = CustomSettings("08:00", "12:00");
         var now = LocalDateTime(2026, 4, 10, nowHour, nowMinute);
-        var expected = now.Date
-            .AddDays(expectedDayOffset)
-            .AddHours(expectedHour)
-            .AddMinutes(expectedMinute);
+        var expected = now.Date.AddDays(expectedDayOffset).AddHours(expectedHour).AddMinutes(expectedMinute);
 
         // Act
         var next = ScheduleService.GetNextChange(settings, now);
@@ -171,17 +159,9 @@ public sealed class ScheduleServiceTests
         var sunset = sun.Sunset ?? throw new InvalidOperationException("Expected sunset.");
 
         // Act
-        var beforeSunrise = ScheduleService.ShouldBeOn(
-            settings,
-            sunrise.AddTicks(-1),
-            Equator,
-            TimeZoneInfo.Utc);
+        var beforeSunrise = ScheduleService.ShouldBeOn(settings, sunrise.AddTicks(-1), Equator, TimeZoneInfo.Utc);
         var atSunrise = ScheduleService.ShouldBeOn(settings, sunrise, Equator, TimeZoneInfo.Utc);
-        var beforeSunset = ScheduleService.ShouldBeOn(
-            settings,
-            sunset.AddTicks(-1),
-            Equator,
-            TimeZoneInfo.Utc);
+        var beforeSunset = ScheduleService.ShouldBeOn(settings, sunset.AddTicks(-1), Equator, TimeZoneInfo.Utc);
         var atSunset = ScheduleService.ShouldBeOn(settings, sunset, Equator, TimeZoneInfo.Utc);
 
         // Assert
@@ -203,21 +183,9 @@ public sealed class ScheduleServiceTests
         var tomorrowSunrise = SolarCalculator.GetSunTimes(Equator, date.AddDays(1), TimeZoneInfo.Utc).Sunrise;
 
         // Act
-        var beforeSunrise = ScheduleService.GetNextChange(
-            settings,
-            sunrise.AddMinutes(-1),
-            Equator,
-            TimeZoneInfo.Utc);
-        var afterSunrise = ScheduleService.GetNextChange(
-            settings,
-            sunrise.AddMinutes(1),
-            Equator,
-            TimeZoneInfo.Utc);
-        var afterSunset = ScheduleService.GetNextChange(
-            settings,
-            sunset.AddMinutes(1),
-            Equator,
-            TimeZoneInfo.Utc);
+        var beforeSunrise = ScheduleService.GetNextChange(settings, sunrise.AddMinutes(-1), Equator, TimeZoneInfo.Utc);
+        var afterSunrise = ScheduleService.GetNextChange(settings, sunrise.AddMinutes(1), Equator, TimeZoneInfo.Utc);
+        var afterSunset = ScheduleService.GetNextChange(settings, sunset.AddMinutes(1), Equator, TimeZoneInfo.Utc);
 
         // Assert
         beforeSunrise.Should().Be(sunrise);
@@ -261,7 +229,12 @@ public sealed class ScheduleServiceTests
 
     private static AppSettings CustomSettings(string on, string off)
     {
-        return new AppSettings { Mode = ScheduleMode.Custom, CustomOn = on, CustomOff = off };
+        return new AppSettings
+        {
+            Mode = ScheduleMode.Custom,
+            CustomOn = on,
+            CustomOff = off
+        };
     }
 
     private static DateTime LocalDateTime(int year, int month, int day, int hour = 0, int minute = 0)

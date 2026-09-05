@@ -4,6 +4,119 @@ namespace NightEmber.Tests.Unit.Services;
 
 public sealed class WatchdogServiceTests
 {
+    [Theory]
+    [InlineData(0, false, 0, 0)]
+    [InlineData(0, true, 0, 0)]
+    [InlineData(1, true, 1, 0)]
+    [InlineData(1, false, 1, 1)]
+    public void Run_WaitResult_RechecksOrderlyExitBeforeRecovery(
+        int signaledHandle,
+        bool orderly,
+        int expectedChecks,
+        int expectedResets)
+    {
+        // Arrange
+        var checks = 0;
+        var resets = 0;
+
+        // Act
+        WatchdogService.Run(
+            () => signaledHandle,
+            () =>
+            {
+                checks++;
+                return orderly;
+            },
+            () => resets++);
+
+        // Assert
+        checks.Should().Be(expectedChecks);
+        resets.Should().Be(expectedResets);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_ParentDisappearsDuringMonitoring_RespectsOrderlyExit(bool orderly)
+    {
+        // Arrange
+        Exception[] failures =
+        [
+            new ArgumentException("parent no longer exists"),
+            new InvalidOperationException(),
+            new System.ComponentModel.Win32Exception()
+        ];
+        var resetCounts = new List<int>();
+
+        // Act
+        foreach (var failure in failures)
+        {
+            var resets = 0;
+            WatchdogService.Run(() => throw failure, () => orderly, () => resets++);
+            resetCounts.Add(resets);
+        }
+
+        // Assert
+        resetCounts.Should().AllSatisfy(resets => resets.Should().Be(orderly ? 0 : 1));
+    }
+
+    [Fact]
+    public void Run_OrderlySignalArrivesWithParentExit_SuppressesRecovery()
+    {
+        // Arrange
+        var orderly = false;
+        var resets = 0;
+
+        // Act
+        WatchdogService.Run(
+            () =>
+            {
+                orderly = true;
+                return 1;
+            },
+            () => orderly,
+            () => resets++);
+
+        // Assert
+        resets.Should().Be(0);
+    }
+
+    [Fact]
+    public void Run_UnrelatedMonitoringFailure_PropagatesWithoutRecovery()
+    {
+        // Arrange
+        var resets = 0;
+        var checks = 0;
+
+        // Act
+        var run = () => WatchdogService.Run(
+            () => throw new IOException("unrelated"),
+            () =>
+            {
+                checks++;
+                return false;
+            },
+            () => resets++);
+
+        // Assert
+        run.Should().Throw<IOException>().WithMessage("unrelated");
+        resets.Should().Be(0);
+        checks.Should().Be(0);
+    }
+
+    [Fact]
+    public void Run_UnexpectedExit_RecoveryFailurePropagates()
+    {
+        // Arrange
+        var failure = new IOException("recovery failed");
+
+        // Act
+        var run = () => WatchdogService.Run(() => 1, () => false, () => throw failure);
+
+        // Assert
+        run.Should().Throw<IOException>().WithMessage("recovery failed");
+    }
+
     [Fact]
     public void TryParseArguments_ValidArguments_ReturnsParsedValues()
     {
@@ -67,9 +180,7 @@ public sealed class WatchdogServiceTests
         // Arrange
         Exception[] exceptions =
         [
-            new ArgumentException(),
-            new InvalidOperationException(),
-            new System.ComponentModel.Win32Exception()
+            new ArgumentException(), new InvalidOperationException(), new System.ComponentModel.Win32Exception()
         ];
 
         // Act

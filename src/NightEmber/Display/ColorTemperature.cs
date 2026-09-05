@@ -1,4 +1,4 @@
-namespace NightEmber.Services;
+namespace NightEmber.Display;
 
 /// <summary>
 /// Converts color temperatures into normalized red, green, and blue multipliers.

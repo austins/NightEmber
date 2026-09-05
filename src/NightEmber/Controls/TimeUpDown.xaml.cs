@@ -39,6 +39,8 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
     private TimeSegment _selectedSegment = TimeSegment.Hour;
     private IReadOnlyList<SegmentRange> _segments = [];
     private bool _updatingText;
+    private bool _validateEdits;
+    private bool _isTextDirty;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TimeUpDown" /> class.
@@ -70,22 +72,42 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
     /// <summary>
     /// Parses the current text using the user's Windows time format.
     /// </summary>
+    /// <remarks>Invalid text is preserved with an error until corrected or cancelled.</remarks>
     /// <returns><see langword="true" /> when the edit contained a valid time.</returns>
     public bool CommitEdit()
     {
-        if (DateTime.TryParse(
-                ValueTextBox.Text,
-                CultureInfo.CurrentCulture,
-                DateTimeStyles.NoCurrentDateDefault,
-                out var parsed))
+        if (!ValidateEdit(out var time))
         {
-            SetCurrentValue(TimeValueProperty, parsed.TimeOfDay);
-            UpdateText();
-            return true;
+            _validateEdits = true;
+            return false;
         }
 
+        SetCurrentValue(TimeValueProperty, time);
         UpdateText();
-        return false;
+        return true;
+    }
+
+    internal bool TryGetEditedTime(out TimeSpan time)
+    {
+        var culture = CultureInfo.CurrentCulture;
+        var valid = TimeOnly.TryParseExact(
+                        ValueTextBox.Text,
+                        culture.DateTimeFormat.ShortTimePattern,
+                        culture,
+                        DateTimeStyles.AllowWhiteSpaces,
+                        out var parsed)
+                    || TimeOnly.TryParse(ValueTextBox.Text, culture, DateTimeStyles.AllowWhiteSpaces, out parsed);
+        time = parsed.ToTimeSpan();
+        return valid;
+    }
+
+    protected override void OnAccessKey(AccessKeyEventArgs e)
+    {
+        ValueTextBox.Focus();
+        if (!_isTextDirty)
+        {
+            SelectSegment(_selectedSegment);
+        }
     }
 
     private static object CoerceMinuteIncrement(DependencyObject element, object value)
@@ -112,7 +134,10 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
 
     private void ChangeValue(int direction)
     {
-        CommitEdit();
+        if (!CommitEdit())
+        {
+            return;
+        }
 
         var adjustment = _selectedSegment switch
         {
@@ -146,7 +171,7 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
 
     private void SelectSegmentAt(int characterIndex)
     {
-        if (_segments.Count == 0)
+        if (_isTextDirty || _segments.Count == 0)
         {
             return;
         }
@@ -172,6 +197,54 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
 
         _selectedSegment = segment;
         ValueTextBox.Select(range.Start, range.Length);
+        UpdateSegmentAccessibility();
+    }
+
+    private void UpdateSegmentAccessibility()
+    {
+        InputValidation.UpdateStatus(
+            ValueTextBox,
+            InputValidation.GetHasError(this) ? InputValidation.GetErrorMessage(this) : SelectedSegmentStatus());
+    }
+
+    private string SelectedSegmentStatus()
+    {
+        return _selectedSegment switch
+        {
+            TimeSegment.Hour => "Hour selected",
+            TimeSegment.Minute => "Minute selected",
+            TimeSegment.Period => "AM/PM selected",
+            _ => throw new InvalidOperationException("Unknown time segment.")
+        };
+    }
+
+    private bool ValidateEdit(out TimeSpan time)
+    {
+        var valid = TryGetEditedTime(out time);
+        var example = DateTime
+            .Today
+            .AddHours(21)
+            .ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture);
+        InputValidation.SetError(
+            this,
+            ValueTextBox,
+            valid ? string.Empty : $"Enter a valid time, for example {example}.",
+            SelectedSegmentStatus());
+        return valid;
+    }
+
+    private void ValueTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (_updatingText)
+        {
+            return;
+        }
+
+        _isTextDirty = true;
+        if (_validateEdits)
+        {
+            ValidateEdit(out _);
+        }
     }
 
     private void UpdateText()
@@ -189,6 +262,9 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
         ValueTextBox.Text = text;
         _segments = FindSegments(date, pattern, text, culture);
         _updatingText = false;
+        _isTextDirty = false;
+        _validateEdits = false;
+        InputValidation.SetError(this, ValueTextBox, string.Empty, SelectedSegmentStatus());
     }
 
     private static IReadOnlyList<SegmentRange> FindSegments(
@@ -220,14 +296,14 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
             if (start >= 0)
             {
                 segments.Add(new SegmentRange(TimeSegment.Minute, start, minuteText.Length));
-                searchIndex = start + minuteText.Length;
             }
         }
 
-        var periodText = date.ToString("tt", culture);
+        var periodToken = TimeFormat.FindToken(pattern, 't');
+        var periodText = periodToken is null ? string.Empty : TimeFormat.FormatToken(date, periodToken, culture);
         if (!string.IsNullOrEmpty(periodText))
         {
-            var start = formatted.IndexOf(periodText, searchIndex, StringComparison.CurrentCulture);
+            var start = formatted.IndexOf(periodText, StringComparison.CurrentCulture);
             if (start >= 0)
             {
                 segments.Add(new SegmentRange(TimeSegment.Period, start, periodText.Length));
@@ -257,8 +333,13 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
         SelectSegmentAt(ValueTextBox.CaretIndex);
     }
 
-    private void ValueTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.KeyboardDevice.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Up:
@@ -269,17 +350,20 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
                 ChangeValue(-1);
                 e.Handled = true;
                 break;
-            case Key.Left:
+            case Key.Left when !_isTextDirty:
                 SelectAdjacentSegment(-1);
                 e.Handled = true;
                 break;
-            case Key.Right:
+            case Key.Right when !_isTextDirty:
                 SelectAdjacentSegment(1);
                 e.Handled = true;
                 break;
             case Key.Enter:
-                CommitEdit();
-                SelectSegment(_selectedSegment);
+                if (CommitEdit())
+                {
+                    SelectSegment(_selectedSegment);
+                }
+
                 e.Handled = true;
                 break;
             case Key.Escape:
