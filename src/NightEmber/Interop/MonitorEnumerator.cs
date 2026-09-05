@@ -54,9 +54,9 @@ internal static class MonitorEnumerator
                 names.Add(new string(deviceName[..terminator]));
                 return true;
             }
-            catch (Exception exception)
+            catch (Exception ex)
             {
-                callbackError = ExceptionDispatchInfo.Capture(exception);
+                callbackError = ExceptionDispatchInfo.Capture(ex);
                 return false;
             }
         });

@@ -47,9 +47,9 @@ internal static class WpfTestHelper
 
                 completion.SetResult();
             }
-            catch (Exception exception)
+            catch (Exception ex)
             {
-                completion.SetException(exception);
+                completion.SetException(ex);
             }
         }) { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);

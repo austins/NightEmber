@@ -136,9 +136,9 @@ internal sealed class AppController : IDisposable
         {
             _gammaService.OpenDisplays();
         }
-        catch (Exception exception) when (IsDisplayException(exception))
+        catch (Exception ex) when (IsDisplayException(ex))
         {
-            ReportGammaError(exception.Message);
+            ReportGammaError(ex.Message);
         }
 
         // Begin from a known neutral ramp, then let the normal state-change path
@@ -154,11 +154,11 @@ internal sealed class AppController : IDisposable
             {
                 _runtime.SaveSettings(_settings);
             }
-            catch (Exception exception) when (IsSettingsException(exception))
+            catch (Exception ex) when (IsSettingsException(ex))
             {
                 loadResult = loadResult with
                 {
-                    Warning = $"Default settings could not be saved beside NightEmber.exe.\n\n{exception.Message}"
+                    Warning = $"Default settings could not be saved beside NightEmber.exe.\n\n{ex.Message}"
                 };
             }
         }
@@ -285,13 +285,13 @@ internal sealed class AppController : IDisposable
             _runtime.SetStartupEnabled(enableStartup);
             return null;
         }
-        catch (Exception exception) when (exception is IOException
-                                              or UnauthorizedAccessException
-                                              or System.Security.SecurityException
-                                              or InvalidOperationException
-                                              or System.Runtime.InteropServices.COMException)
+        catch (Exception ex) when (ex is IOException
+                                       or UnauthorizedAccessException
+                                       or System.Security.SecurityException
+                                       or InvalidOperationException
+                                       or System.Runtime.InteropServices.COMException)
         {
-            return $"Settings were saved, but sign-in startup could not be updated.\n\n{exception.Message}";
+            return $"Settings were saved, but sign-in startup could not be updated.\n\n{ex.Message}";
         }
     }
 
@@ -445,7 +445,7 @@ internal sealed class AppController : IDisposable
         {
             _runtime.Invoke(ResetForSessionEnding);
         }
-        catch (Exception exception) when (exception is OperationCanceledException or InvalidOperationException)
+        catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException)
         {
             // The dispatcher is already shutting down, so restore the displays directly.
             _gammaService.ResetAll();
@@ -511,9 +511,9 @@ internal sealed class AppController : IDisposable
             _currentBrightness = brightness;
             _neutralRestored = false;
         }
-        catch (Exception exception) when (IsDisplayException(exception))
+        catch (Exception ex) when (IsDisplayException(ex))
         {
-            ReportGammaError(exception.Message);
+            ReportGammaError(ex.Message);
             StopFade();
         }
     }
@@ -529,9 +529,9 @@ internal sealed class AppController : IDisposable
         {
             _gammaService.RepairDrift();
         }
-        catch (Exception exception) when (IsDisplayException(exception))
+        catch (Exception ex) when (IsDisplayException(ex))
         {
-            ReportGammaError(exception.Message);
+            ReportGammaError(ex.Message);
         }
     }
 
@@ -575,9 +575,9 @@ internal sealed class AppController : IDisposable
                 UpdateSchedule(true);
             }
         }
-        catch (Exception exception) when (IsDisplayException(exception))
+        catch (Exception ex) when (IsDisplayException(ex))
         {
-            ReportGammaError(exception.Message);
+            ReportGammaError(ex.Message);
         }
     }
 
@@ -652,7 +652,7 @@ internal sealed class AppController : IDisposable
                 _gammaService.ResetAll();
             }
         }
-        catch (Exception exception) when (IsDisplayException(exception))
+        catch (Exception ex) when (IsDisplayException(ex))
         {
             _gammaService.ResetAll();
         }

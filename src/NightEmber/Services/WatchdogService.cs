@@ -159,7 +159,7 @@ internal sealed class WatchdogService : IDisposable
                 resetDisplays();
             }
         }
-        catch (Exception exception) when (IsProcessMonitoringException(exception))
+        catch (Exception ex) when (IsProcessMonitoringException(ex))
         {
             // The parent may exit between lookup and handle acquisition. If it did
             // not report an orderly exit, recover the display state immediately.

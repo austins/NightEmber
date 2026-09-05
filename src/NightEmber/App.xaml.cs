@@ -79,11 +79,10 @@ public sealed partial class App : Application, IDisposable
         {
             _watchdog.Start();
         }
-        catch (Exception exception) when
-            (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             MessageBox.Show(
-                $"Night Ember could not start its display cleanup watchdog.\n\n{exception.Message}",
+                $"Night Ember could not start its display cleanup watchdog.\n\n{ex.Message}",
                 "Night Ember",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
