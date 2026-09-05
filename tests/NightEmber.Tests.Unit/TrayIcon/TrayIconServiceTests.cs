@@ -2,6 +2,8 @@ using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using NightEmber.TrayIcon;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 
 namespace NightEmber.Tests.Unit.TrayIcon;
@@ -129,13 +131,181 @@ public sealed class TrayIconServiceTests
             menu.Items.Count.Should().Be(5);
             menu.Items[1].Should().BeOfType<Separator>();
             menu.Items[3].Should().BeOfType<Separator>();
-            toggle.Header.Should().Be("Turn on now");
-            showSettings.Header.Should().Be("Settings...");
-            exit.Header.Should().Be("Exit");
+            toggle.Header.Should().Be("_Turn on now");
+            showSettings.Header.Should().Be("_Settings...");
+            exit.Header.Should().Be("E_xit");
+            new MenuItemAutomationPeer(toggle).GetName().Should().Be("Turn on now");
+            new MenuItemAutomationPeer(showSettings).GetName().Should().Be("Settings...");
+            new MenuItemAutomationPeer(exit).GetName().Should().Be("Exit");
+            AutomationProperties.GetName(menu).Should().Be("Night Ember");
+            AutomationProperties.GetName(icon).Should().Be("Night Ember");
+            AutomationProperties.GetItemStatus(icon).Should().Be("Tint off");
             toggles.Should().Be(1);
             settings.Should().Be(2);
             exits.Should().Be(1);
             icon.IsCreated.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task TrayKeyboardKeySelect_KeyboardAndMouseNotifications_ActivateSettingsOncePerInput()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            var settings = 0;
+            using var service = new TrayIconService(icon, static () => { }, () => settings++, static () => { });
+
+            // Act
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardKeySelectEvent));
+            var keyboardActivations = settings;
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayLeftMouseUpEvent));
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardSelectEvent));
+
+            // Assert
+            keyboardActivations.Should().Be(1);
+            settings.Should().Be(2);
+            icon.IsCreated.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task TrayKeyboardContextMenu_OpenAndDismiss_FocusesFirstItemAndReturnsToTrayOnce()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            var opened = 0;
+            var focused = 0;
+            var restored = 0;
+            using var service = new TrayIconService(
+                icon,
+                static () => { },
+                static () => { },
+                static () => { },
+                () =>
+                {
+                    opened++;
+                    return true;
+                },
+                () => focused++,
+                () => restored++);
+            var menu = icon.ContextMenu;
+
+            // Act
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
+
+            // Assert
+            opened.Should().Be(1);
+            focused.Should().Be(1);
+            restored.Should().Be(1);
+            menu.IsOpen.Should().BeFalse();
+            icon.IsCreated.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task TrayKeyboardContextMenu_OpeningCancelled_AllowsRetryWithoutReturningFocus()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            var requests = 0;
+            var focusChanges = 0;
+            using var service = new TrayIconService(
+                icon,
+                static () => { },
+                static () => { },
+                static () => { },
+                () =>
+                {
+                    requests++;
+                    return false;
+                },
+                () => focusChanges++,
+                () => focusChanges++);
+            var menu = icon.ContextMenu;
+
+            // Act
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
+
+            // Assert
+            requests.Should().Be(2);
+            focusChanges.Should().Be(0);
+            icon.IsCreated.Should().BeFalse();
+            menu.IsOpen.Should().BeFalse();
+        });
+    }
+
+    [Theory]
+    [InlineData(2)]
+    [InlineData(4)]
+    public async Task TrayKeyboardContextMenu_SettingsOrExitSelected_DoesNotStealFocusAfterAction(int itemIndex)
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            var callbacks = 0;
+            var restored = 0;
+            using var service = new TrayIconService(
+                icon,
+                static () => { },
+                () => callbacks++,
+                () => callbacks++,
+                static () => true,
+                static () => { },
+                () => restored++);
+            var menu = icon.ContextMenu;
+
+            // Act
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
+            ((MenuItem)menu.Items[itemIndex]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
+
+            // Assert
+            callbacks.Should().Be(1);
+            restored.Should().Be(0);
+            icon.IsCreated.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task TrayMenu_MousePopupLifecycle_DoesNotChangeKeyboardFocus()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            var focusChanges = 0;
+            using var service = new TrayIconService(
+                icon,
+                static () => { },
+                static () => { },
+                static () => { },
+                static () => true,
+                () => focusChanges++,
+                () => focusChanges++);
+            var menu = icon.ContextMenu;
+
+            // Act
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
+
+            // Assert
+            focusChanges.Should().Be(0);
+            icon.IsCreated.Should().BeFalse();
+            menu.IsOpen.Should().BeFalse();
         });
     }
 
@@ -166,7 +336,7 @@ public sealed class TrayIconServiceTests
             offHandle.Should().NotBe(nint.Zero);
             foreach (var result in results)
             {
-                result.Header.Should().Be(result.IsOn ? "Turn off now" : "Turn on now");
+                result.Header.Should().Be(result.IsOn ? "_Turn off now" : "_Turn on now");
                 result.Tooltip.Should().Be(new string('a', 62));
                 // Setting Icon would transfer ownership to the library and invalidate a cached icon on the next update.
                 result.OwnsIcon.Should().BeFalse();
@@ -185,6 +355,63 @@ public sealed class TrayIconServiceTests
         });
     }
 
+    [Theory]
+    [InlineData(true, "Turn off now", "Tint on")]
+    [InlineData(false, "Turn on now", "Tint off")]
+    public async Task Update_TintState_ExposesAccessibleActionAndStatus(bool isOn, string action, string status)
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
+            var toggle = (MenuItem)icon.ContextMenu.Items[0];
+
+            // Act
+            service.Update(isOn, "Night Ember test state");
+
+            // Assert
+            new MenuItemAutomationPeer(toggle).GetName().Should().Be(action);
+            AutomationProperties.GetItemStatus(toggle).Should().Be(status);
+            AutomationProperties.GetItemStatus(icon).Should().Be(status);
+            icon.ToolTipText.Should().Be("Night Ember test state");
+            icon.IsCreated.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task Dispose_KeyboardPopupRequested_CancelsFocusWithoutReturningToShell()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            var focused = 0;
+            var restored = 0;
+            using var service = new TrayIconService(
+                icon,
+                static () => { },
+                static () => { },
+                static () => { },
+                static () => true,
+                () => focused++,
+                () => restored++);
+            var menu = icon.ContextMenu;
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
+
+            // Act
+            service.Dispose();
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
+
+            // Assert
+            focused.Should().Be(0);
+            restored.Should().Be(0);
+            icon.IsDisposed.Should().BeTrue();
+            menu.IsOpen.Should().BeFalse();
+        });
+    }
+
     [Fact]
     public async Task Dispose_RepeatedDisposal_DetachesHandlersAndRejectsFurtherUpdates()
     {
@@ -193,7 +420,18 @@ public sealed class TrayIconServiceTests
             // Arrange
             using var icon = new TaskbarIcon();
             var callbacks = 0;
-            using var service = new TrayIconService(icon, () => callbacks++, () => callbacks++, () => callbacks++);
+            using var service = new TrayIconService(
+                icon,
+                () => callbacks++,
+                () => callbacks++,
+                () => callbacks++,
+                () =>
+                {
+                    callbacks++;
+                    return true;
+                },
+                () => callbacks++,
+                () => callbacks++);
             var menu = icon.ContextMenu;
             menu.Resources.MergedDictionaries.Add(new ResourceDictionary());
             var items = menu.Items.OfType<MenuItem>().ToArray();
@@ -207,6 +445,10 @@ public sealed class TrayIconServiceTests
             }
 
             icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayLeftMouseUpEvent));
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardKeySelectEvent));
+            icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+            menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
             var update = () => service.Update(true, "Night Ember");
             var showError = () => service.ShowError("Error");
 

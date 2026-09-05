@@ -3,12 +3,26 @@
     <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="/PresentationFramework.Fluent;component/Styles/RepeatButton.xaml" />
     </ResourceDictionary.MergedDictionaries>
+    <Style x:Key="SpinnerBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlStrongStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Background" Value="{DynamicResource TextControlBackground}" />
+        <Style.Triggers>
+            <DataTrigger
+                Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                Value="True">
+                <Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushFocused}" />
+                <Setter Property="BorderThickness" Value="2" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
     <Style x:Key="SpinnerButtonStyle"
            TargetType="{x:Type RepeatButton}"
            BasedOn="{StaticResource DefaultRepeatButtonStyle}">
         <Setter Property="Delay" Value="400" />
         <Setter Property="Interval" Value="70" />
         <Setter Property="Focusable" Value="False" />
+        <Setter Property="IsTabStop" Value="False" />
         <Setter Property="MinWidth" Value="0" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />

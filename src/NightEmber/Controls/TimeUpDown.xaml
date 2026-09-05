@@ -4,6 +4,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              MinWidth="100"
              Height="28"
+             Focusable="False"
+             IsTabStop="False"
+             KeyboardNavigation.TabNavigation="Once"
              PreviewMouseWheel="TimeUpDown_PreviewMouseWheel">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -12,9 +15,7 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <Border BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}"
-            BorderThickness="1"
-            Background="{DynamicResource TextControlBackground}">
+    <Border Style="{StaticResource SpinnerBorderStyle}">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -28,6 +29,7 @@
                      Padding="5,0,4,0"
                      VerticalContentAlignment="Center"
                      AutomationProperties.LabeledBy="{Binding Path=(AutomationProperties.LabeledBy), ElementName=Root}"
+                     AutomationProperties.AcceleratorKey="{Binding Path=(AutomationProperties.AcceleratorKey), ElementName=Root}"
                      AutomationProperties.HelpText="{Binding Path=(AutomationProperties.HelpText), ElementName=Root}"
                      GotKeyboardFocus="ValueTextBox_GotKeyboardFocus"
                      PreviewKeyDown="ValueTextBox_PreviewKeyDown"

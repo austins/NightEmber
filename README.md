@@ -28,9 +28,9 @@ display's gamma ramp and runs quietly in the system tray.
 3. Adjust the settings and select **Save**.
 4. Use the crescent moon in the system tray to toggle the effect, reopen settings, or exit.
 
-Warmth and brightness changes are previewed immediately and remain active while the settings window is open.
-Select **Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray
-toggle while the window is open ends the preview and applies a manual override.
+Warmth and brightness changes are previewed immediately and remain active while the settings window is open. Select
+**Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray toggle
+while the window is open ends the preview and applies a manual override.
 
 Closing the settings window leaves Night Ember running in the tray. Choose **Exit**
 from the tray menu to stop the application and restore neutral display gamma.
@@ -38,18 +38,44 @@ from the tray menu to stop the application and restore neutral display gamma.
 A manual tray toggle temporarily overrides an active schedule. The override expires when the schedule next changes
 naturally.
 
+## Keyboard access
+
+The settings window starts with focus on Strength. Use **Tab** and **Shift+Tab** to move through settings and the
+Save/Cancel buttons. Only the selected schedule option is a tab stop; use the arrow keys to select another schedule.
+Disabled custom-time fields are skipped.
+
+| Shortcut              | Action                                          |
+|-----------------------|-------------------------------------------------|
+| Alt+G / Alt+B         | Focus Strength / Brightness                     |
+| Alt+N / Alt+U / Alt+H | Select manual / sunset / custom-hour scheduling |
+| Alt+O / Alt+F         | Focus the custom turn-on / turn-off time        |
+| Alt+T                 | Focus transition duration                       |
+| Alt+A                 | Toggle start at sign-in                         |
+| Alt+S / Alt+C         | Save / Cancel                                   |
+
+In time fields, **Left/Right** selects the hour, minute, or AM/PM segment and **Up/Down** adjusts it. In the transition
+field, **Up/Down** adjusts the duration by 50 milliseconds. Modified arrow keys retain normal text-editing behavior.
+Inside these fields, **Enter** commits the edit and **Escape** restores it; use **Alt+S** or **Alt+C** to save or cancel
+the whole window. Elsewhere, Enter and Escape activate the default Save and Cancel actions when not consumed by a
+control.
+
+For the tray icon, press **Win+B**, then use the arrow keys to select Night Ember (open the hidden-icons area if
+needed). **Enter** opens settings; **Shift+F10** or the context-menu key opens its menu. In the menu, use **Up/Down**
+and **Enter**, or press **T** to toggle the tint, **S** for settings, and **X** to exit. **Escape** dismisses the menu
+and returns focus to the notification area.
+
 ## Portable settings
 
 Settings are saved as `NightEmber.config.json` beside `NightEmber.exe`:
 
-| Setting       | Range                        | Default  | Purpose                         |
-|---------------|------------------------------|----------|---------------------------------|
-| `Temperature` | 1200-6500                    | `3400`   | Color temperature while enabled |
+| Setting       | Range                        | Default  | Purpose                                   |
+|---------------|------------------------------|----------|-------------------------------------------|
+| `Temperature` | 1200-6500                    | `3400`   | Color temperature while enabled           |
 | `Brightness`  | 50-100                       | `100`    | Brightness percentage (100% = no dimming) |
-| `Mode`        | `Manual`, `Sunset`, `Custom` | `Sunset` | Scheduling mode                 |
-| `CustomOn`    | `HH:mm`                      | `21:00`  | Custom schedule start           |
-| `CustomOff`   | `HH:mm`                      | `07:00`  | Custom schedule end             |
-| `FadeMs`      | 0-5000                       | `300`    | Transition duration             |
+| `Mode`        | `Manual`, `Sunset`, `Custom` | `Sunset` | Scheduling mode                           |
+| `CustomOn`    | `HH:mm`                      | `21:00`  | Custom schedule start                     |
+| `CustomOff`   | `HH:mm`                      | `07:00`  | Custom schedule end                       |
+| `FadeMs`      | 0-5000                       | `300`    | Transition duration                       |
 
 The executable must be in a folder the current user can write to. A folder under the user profile is recommended;
 protected folders such as `Program Files` prevent the portable configuration from being saved.

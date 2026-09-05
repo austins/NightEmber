@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Input;
 
 namespace NightEmber.Controls;
@@ -88,6 +90,12 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
         return false;
     }
 
+    protected override void OnAccessKey(AccessKeyEventArgs e)
+    {
+        ValueTextBox.Focus();
+        SelectSegment(_selectedSegment);
+    }
+
     private static object CoerceMinuteIncrement(DependencyObject element, object value)
     {
         return Math.Clamp((int)value, 1, 59);
@@ -172,6 +180,36 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
 
         _selectedSegment = segment;
         ValueTextBox.Select(range.Start, range.Length);
+        UpdateSegmentAccessibility();
+    }
+
+    private void UpdateSegmentAccessibility()
+    {
+        var status = _selectedSegment switch
+        {
+            TimeSegment.Hour => "Hour selected",
+            TimeSegment.Minute => "Minute selected",
+            TimeSegment.Period => "AM/PM selected",
+            _ => throw new InvalidOperationException("Unknown time segment.")
+        };
+        var previous = AutomationProperties.GetItemStatus(ValueTextBox);
+        if (previous == status)
+        {
+            return;
+        }
+
+        // A text selection alone does not identify which part the spinner will adjust.
+        AutomationProperties.SetItemStatus(ValueTextBox, status);
+        var peer = UIElementAutomationPeer.FromElement(ValueTextBox);
+        peer?.RaisePropertyChangedEvent(AutomationElementIdentifiers.ItemStatusProperty, previous, status);
+        if (IsKeyboardFocusWithin && AutomationPeer.ListenerExists(AutomationEvents.Notification))
+        {
+            peer?.RaiseNotificationEvent(
+                AutomationNotificationKind.ActionCompleted,
+                AutomationNotificationProcessing.MostRecent,
+                status,
+                "TimeSegmentSelection");
+        }
     }
 
     private void UpdateText()
@@ -188,6 +226,7 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
         var text = date.ToString(pattern, culture);
         ValueTextBox.Text = text;
         _segments = FindSegments(date, pattern, text, culture);
+        UpdateSegmentAccessibility();
         _updatingText = false;
     }
 
@@ -259,6 +298,11 @@ public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
 
     private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Up:

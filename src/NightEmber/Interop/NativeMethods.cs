@@ -106,6 +106,25 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool DestroyIcon(nint icon);
 
+    /// <summary>
+    /// Retrieves the screen-pixel bounds of a notification-area icon.
+    /// </summary>
+    /// <param name="identifier">The initialized shell icon identifier.</param>
+    /// <param name="rectangle">The icon's bounds when the lookup succeeds.</param>
+    /// <returns>An HRESULT indicating success or failure.</returns>
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+    [LibraryImport("shell32.dll", EntryPoint = "Shell_NotifyIconGetRect")]
+    public static partial int ShellNotifyIconGetRect(in NotifyIconIdentifier identifier, out NativeRectangle rectangle);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NotifyIconIdentifier
+    {
+        public uint Size;
+        public nint Window;
+        public uint IconId;
+        public Guid Id;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct MonitorInfo
     {

@@ -10,6 +10,8 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         Icon="Resources/AppIcon.ico"
+        FocusManager.FocusedElement="{Binding ElementName=StrengthSlider}"
+        KeyboardNavigation.TabNavigation="Cycle"
         Background="{DynamicResource WindowBackground}"
         Foreground="{DynamicResource TextFillColorPrimaryBrush}">
     <Grid>
@@ -17,7 +19,8 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto"
+                      Focusable="False" IsTabStop="False">
             <Grid Margin="28,22,28,16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -55,7 +58,8 @@
 
                 <StackPanel Grid.Row="1" Margin="0,0,0,18">
                     <DockPanel>
-                        <TextBlock x:Name="StrengthLabel" Text="Strength" FontWeight="SemiBold" />
+                        <Label x:Name="StrengthLabel" Content="Stren_gth" Target="{Binding ElementName=StrengthSlider}"
+                               Padding="0" FontWeight="SemiBold" />
                         <TextBlock x:Name="StrengthValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
                     </DockPanel>
                     <TextBlock Text="Controls how warm the display looks. Higher values reduce more blue light."
@@ -70,13 +74,16 @@
                             IsSnapToTickEnabled="False"
                             ValueChanged="PreviewSlider_ValueChanged"
                             AutomationProperties.LabeledBy="{Binding ElementName=StrengthLabel}"
+                            AutomationProperties.AcceleratorKey="Alt+G"
                             AutomationProperties.HelpText="Controls how warm the display looks. Higher values reduce more blue light."
                             Margin="0,8,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="2" Margin="0,0,0,20">
                     <DockPanel>
-                        <TextBlock x:Name="BrightnessLabel" Text="Brightness" FontWeight="SemiBold" />
+                        <Label x:Name="BrightnessLabel" Content="_Brightness"
+                               Target="{Binding ElementName=BrightnessSlider}"
+                               Padding="0" FontWeight="SemiBold" />
                         <TextBlock x:Name="BrightnessValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
                     </DockPanel>
                     <TextBlock Text="Darkens the image in software without changing the monitor's backlight."
@@ -91,6 +98,7 @@
                             IsSnapToTickEnabled="False"
                             ValueChanged="PreviewSlider_ValueChanged"
                             AutomationProperties.LabeledBy="{Binding ElementName=BrightnessLabel}"
+                            AutomationProperties.AcceleratorKey="Alt+B"
                             AutomationProperties.HelpText="Darkens the image in software without changing the monitor's backlight."
                             Margin="0,8,0,0" />
                 </StackPanel>
@@ -106,25 +114,32 @@
                         </DataTemplate>
                     </GroupBox.HeaderTemplate>
                     <StackPanel>
-                        <RadioButton x:Name="ManualModeRadio"
-                                     Content="Never (manual only)"
-                                     GroupName="Schedule"
-                                     Checked="ScheduleMode_Checked"
-                                     Margin="0,0,0,4" />
-                        <RadioButton x:Name="SunsetModeRadio"
-                                     Content="Sunset to sunrise"
-                                     GroupName="Schedule"
-                                     Checked="ScheduleMode_Checked"
-                                     Margin="0,0,0,4" />
-                        <TextBlock x:Name="SunInfoText"
-                                   Margin="22,0,0,12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   TextWrapping="Wrap" />
-                        <RadioButton x:Name="CustomModeRadio"
-                                     Content="Set hours"
-                                     GroupName="Schedule"
-                                     Checked="ScheduleMode_Checked"
-                                     Margin="0,0,0,8" />
+                        <StackPanel KeyboardNavigation.TabNavigation="Continue"
+                                    KeyboardNavigation.DirectionalNavigation="Cycle"
+                                    PreviewKeyDown="ScheduleOptions_PreviewKeyDown">
+                            <RadioButton x:Name="ManualModeRadio"
+                                         Content="_Never (manual only)"
+                                         IsTabStop="{Binding IsChecked, RelativeSource={RelativeSource Self}}"
+                                         GroupName="Schedule"
+                                         Checked="ScheduleMode_Checked"
+                                         Margin="0,0,0,4" />
+                            <RadioButton x:Name="SunsetModeRadio"
+                                         Content="S_unset to sunrise"
+                                         IsTabStop="{Binding IsChecked, RelativeSource={RelativeSource Self}}"
+                                         GroupName="Schedule"
+                                         Checked="ScheduleMode_Checked"
+                                         Margin="0,0,0,4" />
+                            <TextBlock x:Name="SunInfoText"
+                                       Margin="22,0,0,12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                            <RadioButton x:Name="CustomModeRadio"
+                                         Content="Set _hours"
+                                         IsTabStop="{Binding IsChecked, RelativeSource={RelativeSource Self}}"
+                                         GroupName="Schedule"
+                                         Checked="ScheduleMode_Checked"
+                                         Margin="0,0,0,8" />
+                        </StackPanel>
                         <Grid x:Name="CustomTimePanel" Margin="22,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -133,26 +148,32 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="110" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="CustomOnLabel"
-                                       Grid.Column="0"
-                                       Text="Turn on"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0" />
+                            <Label x:Name="CustomOnLabel"
+                                   Grid.Column="0"
+                                   Content="Turn _on"
+                                   Target="{Binding ElementName=CustomOnInput}"
+                                   Padding="0"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0" />
                             <controls:TimeUpDown x:Name="CustomOnInput"
                                                  Grid.Column="1"
                                                  MinuteIncrement="5"
                                                  AutomationProperties.LabeledBy="{Binding ElementName=CustomOnLabel}"
-                                                 AutomationProperties.HelpText="Enter the time when Night Ember should turn on." />
-                            <TextBlock x:Name="CustomOffLabel"
-                                       Grid.Column="3"
-                                       Text="Turn off"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0" />
+                                                 AutomationProperties.AcceleratorKey="Alt+O"
+                                                 AutomationProperties.HelpText="Turn-on time. Type a time or use Left and Right to select hours, minutes, or AM/PM, then Up and Down to adjust. Enter commits the edit; Escape restores it." />
+                            <Label x:Name="CustomOffLabel"
+                                   Grid.Column="3"
+                                   Content="Turn o_ff"
+                                   Target="{Binding ElementName=CustomOffInput}"
+                                   Padding="0"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0" />
                             <controls:TimeUpDown x:Name="CustomOffInput"
                                                  Grid.Column="4"
                                                  MinuteIncrement="5"
                                                  AutomationProperties.LabeledBy="{Binding ElementName=CustomOffLabel}"
-                                                 AutomationProperties.HelpText="Enter the time when Night Ember should turn off." />
+                                                 AutomationProperties.AcceleratorKey="Alt+F"
+                                                 AutomationProperties.HelpText="Turn-off time. Type a time or use Left and Right to select hours, minutes, or AM/PM, then Up and Down to adjust. Enter commits the edit; Escape restores it." />
                         </Grid>
                     </StackPanel>
                 </GroupBox>
@@ -166,9 +187,11 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock x:Name="FadeDurationLabel"
-                               Text="Transition duration (0 to 5000 ms)"
-                               VerticalAlignment="Center" />
+                    <Label x:Name="FadeDurationLabel"
+                           Content="_Transition duration (0 to 5000 ms)"
+                           Target="{Binding ElementName=FadeDurationInput}"
+                           Padding="0"
+                           VerticalAlignment="Center" />
                     <controls:NumericUpDown x:Name="FadeDurationInput"
                                             Grid.Row="0"
                                             Grid.Column="1"
@@ -176,13 +199,14 @@
                                             Maximum="5000"
                                             Increment="50"
                                             AutomationProperties.LabeledBy="{Binding ElementName=FadeDurationLabel}"
-                                            AutomationProperties.HelpText="Enter the transition duration in milliseconds."
+                                            AutomationProperties.AcceleratorKey="Alt+T"
+                                            AutomationProperties.HelpText="Transition duration, from 0 to 5000 milliseconds. Type a value or use Up and Down to adjust by 50 milliseconds. Enter commits the edit; Escape restores it."
                                             VerticalAlignment="Center" />
                     <CheckBox x:Name="StartupCheckBox"
                               Grid.Row="1"
                               Grid.Column="0"
                               Grid.ColumnSpan="2"
-                              Content="Start automatically when I sign in"
+                              Content="Start _automatically when I sign in"
                               Margin="0,16,0,0" />
                 </Grid>
 
@@ -202,9 +226,13 @@
                        Margin="0,0,16,0" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
                         VerticalAlignment="Center">
-                <Button Content="Cancel" IsCancel="True" Click="CancelButton_Click" Margin="0,0,10,0" />
-                <Button Content="Save" IsDefault="True" Click="SaveButton_Click"
-                        Style="{DynamicResource AccentButtonStyle}" Padding="18,7" MinWidth="82" />
+                <Button IsCancel="True" Click="CancelButton_Click" Margin="0,0,10,0">
+                    <AccessText Text="_Cancel" />
+                </Button>
+                <Button IsDefault="True" Click="SaveButton_Click"
+                        Style="{DynamicResource AccentButtonStyle}" Padding="18,7" MinWidth="82">
+                    <AccessText Text="_Save" />
+                </Button>
             </StackPanel>
         </Grid>
     </Grid>

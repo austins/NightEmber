@@ -3,6 +3,9 @@ using NightEmber.Services;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 
 namespace NightEmber;
 
@@ -144,6 +147,35 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void ScheduleOptions_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.None || e.OriginalSource is not RadioButton current)
+        {
+            return;
+        }
+
+        var direction = e.Key switch
+        {
+            Key.Up => -1,
+            Key.Down => 1,
+            Key.Left => FlowDirection == FlowDirection.RightToLeft ? 1 : -1,
+            Key.Right => FlowDirection == FlowDirection.RightToLeft ? -1 : 1,
+            _ => 0
+        };
+
+        if (direction == 0)
+        {
+            return;
+        }
+
+        RadioButton[] options = [ManualModeRadio, SunsetModeRadio, CustomModeRadio];
+        var index = Array.IndexOf(options, current);
+        var next = options[(index + direction + options.Length) % options.Length];
+        next.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+        next.Focus();
+        e.Handled = true;
+    }
+
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
         if (!CustomOnInput.CommitEdit() || !CustomOffInput.CommitEdit())
@@ -189,12 +221,12 @@ public sealed partial class MainWindow : Window
                 MessageBox.Show(warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
-        catch (Exception exception) when (exception is IOException
-                                              or UnauthorizedAccessException
-                                              or System.Security.SecurityException)
+        catch (Exception ex) when (ex is IOException
+                                       or UnauthorizedAccessException
+                                       or System.Security.SecurityException)
         {
             MessageBox.Show(
-                $"The settings could not be saved.\n\n{exception.Message}",
+                $"The settings could not be saved.\n\n{ex.Message}",
                 "Night Ember",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);

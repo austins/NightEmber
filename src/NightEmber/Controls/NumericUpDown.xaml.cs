@@ -111,6 +111,12 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
         UpdateText();
     }
 
+    protected override void OnAccessKey(AccessKeyEventArgs e)
+    {
+        ValueTextBox.Focus();
+        ValueTextBox.SelectAll();
+    }
+
     private static object CoerceIncrement(DependencyObject element, object value)
     {
         return Math.Max(1, (int)value);
@@ -171,6 +177,11 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
 
     private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Up:
