@@ -11,6 +11,33 @@ namespace NightEmber.Tests.Unit.Controls;
 public sealed class SpinnerValidationTests
 {
     [Theory]
+    [InlineData(false, Key.Up, ModifierKeys.Control)]
+    [InlineData(false, Key.Down, ModifierKeys.Shift)]
+    [InlineData(false, Key.Enter, ModifierKeys.Alt)]
+    [InlineData(true, Key.Up, ModifierKeys.Control)]
+    [InlineData(true, Key.Down, ModifierKeys.Shift)]
+    [InlineData(true, Key.Enter, ModifierKeys.Alt)]
+    public async Task ModifiedKey_InvalidEdit_LeavesTheGestureUnhandled(bool timeInput, Key key, ModifierKeys modifiers)
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            var control = CreateInput(timeInput);
+            var input = Input(control);
+            input.Text = "invalid";
+
+            // Act
+            var args = WpfTestHelper.PressKey(input, key, modifiers);
+
+            // Assert
+            args.Handled.Should().BeFalse();
+            input.Text.Should().Be("invalid");
+            InputValidation.GetHasError(control).Should().BeFalse();
+            PreviousValueIsUnchanged(control);
+        });
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task LostFocus_InvalidEdit_PreservesTextAndExposesAccessibleError(bool timeInput)

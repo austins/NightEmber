@@ -5,11 +5,90 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 
 namespace NightEmber.Tests.Unit;
 
 public sealed class MainWindowTests
 {
+    [Theory]
+    [InlineData(Key.Down, FlowDirection.LeftToRight, "ManualModeRadio")]
+    [InlineData(Key.Up, FlowDirection.LeftToRight, "SunsetModeRadio")]
+    [InlineData(Key.Right, FlowDirection.LeftToRight, "ManualModeRadio")]
+    [InlineData(Key.Left, FlowDirection.LeftToRight, "SunsetModeRadio")]
+    [InlineData(Key.Left, FlowDirection.RightToLeft, "ManualModeRadio")]
+    [InlineData(Key.Right, FlowDirection.RightToLeft, "SunsetModeRadio")]
+    public async Task ScheduleArrowKey_SelectsAndWrapsAccordingToFlowDirection(
+        Key key,
+        FlowDirection flowDirection,
+        string expectedRadio)
+    {
+        await WithWindow((window, _) =>
+        {
+            // Arrange
+            window.FlowDirection = flowDirection;
+            var current = (RadioButton)window.FindName("CustomModeRadio");
+            var expected = (RadioButton)window.FindName(expectedRadio);
+
+            // Act
+            var args = WpfTestHelper.PressKey(current, key);
+
+            // Assert
+            args.Handled.Should().BeTrue();
+            expected.IsChecked.Should().BeTrue();
+            current.IsChecked.Should().BeFalse();
+            ((Grid)window.FindName("CustomTimePanel")).IsEnabled.Should().BeFalse();
+        });
+    }
+
+    [Theory]
+    [InlineData(Key.Down, ModifierKeys.Control)]
+    [InlineData(Key.Up, ModifierKeys.Shift)]
+    [InlineData(Key.Right, ModifierKeys.Alt)]
+    [InlineData(Key.Tab, ModifierKeys.None)]
+    [InlineData(Key.Home, ModifierKeys.None)]
+    public async Task ScheduleKey_ModifiedOrUnrelated_DoesNotChangeTheSelection(Key key, ModifierKeys modifiers)
+    {
+        await WithWindow((window, _) =>
+        {
+            // Arrange
+            var current = (RadioButton)window.FindName("CustomModeRadio");
+
+            // Act
+            var args = WpfTestHelper.PressKey(current, key, modifiers);
+
+            // Assert
+            args.Handled.Should().BeFalse();
+            current.IsChecked.Should().BeTrue();
+            ((Grid)window.FindName("CustomTimePanel")).IsEnabled.Should().BeTrue();
+        });
+    }
+
+    [Fact]
+    public async Task Cancel_AfterSliderPreview_RestoresSavedGammaWithoutSaving()
+    {
+        await WithWindow((window, fixture) =>
+        {
+            // Arrange
+            var strength = (Slider)window.FindName("StrengthSlider");
+            var brightness = (Slider)window.FindName("BrightnessSlider");
+            var footer = (Grid)((Grid)window.Content).Children[1];
+            var buttons = footer.Children.OfType<StackPanel>().Single();
+            var cancel = buttons.Children.OfType<Button>().Single(static button => button.IsCancel);
+
+            // Act
+            strength.Value = 40;
+            brightness.Value = 80;
+            var preview = fixture.Gamma.Applied[^1];
+            cancel.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+
+            // Assert
+            preview.Should().Be((MainWindow.StrengthToTemperature(40), 80d));
+            fixture.Gamma.Applied[^1].Should().Be((3400d, 75d));
+            fixture.Runtime.Saved.Should().BeNull();
+        });
+    }
+
     [Theory]
     [InlineData("CustomOnInput", "1212:00 PM", "CustomOnErrorText")]
     [InlineData("CustomOffInput", "", "CustomOffErrorText")]

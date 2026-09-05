@@ -17,6 +17,9 @@ internal static class WpfTestHelper
 {
     private static readonly Lock ExecutionLock = new();
 
+    [ThreadStatic]
+    private static TestKeyboardDevice? _keyboardDevice;
+
     /// <summary>
     /// Runs synchronous test code on a dedicated background STA thread and shuts down its dispatcher afterward.
     /// </summary>
@@ -41,6 +44,7 @@ internal static class WpfTestHelper
                     }
                     finally
                     {
+                        _keyboardDevice = null;
                         Dispatcher.CurrentDispatcher.InvokeShutdown();
                     }
                 }
@@ -62,19 +66,57 @@ internal static class WpfTestHelper
     /// </summary>
     /// <param name="element">The element whose routed input handlers should receive the event.</param>
     /// <param name="key">The key represented by the event.</param>
+    /// <param name="modifiers">The modifier keys supplied by the synthetic keyboard, independent of physical input.</param>
     /// <returns>The event arguments, allowing assertions against properties such as <see cref="RoutedEventArgs.Handled" />.</returns>
     /// <remarks>
     /// Call this on the element's owning STA thread. It exercises routed handlers, not native keyboard delivery,
     /// text insertion, or physical key state.
     /// </remarks>
-    public static KeyEventArgs PressKey(UIElement element, Key key)
+    public static KeyEventArgs PressKey(UIElement element, Key key, ModifierKeys modifiers = ModifierKeys.None)
     {
-        var args = new KeyEventArgs(Keyboard.PrimaryDevice, new TestPresentationSource(), 0, key)
+        _keyboardDevice ??= new TestKeyboardDevice(InputManager.Current);
+        _keyboardDevice.SetPressedKeys(key, modifiers);
+        var args = new KeyEventArgs(_keyboardDevice, new TestPresentationSource(), 0, key)
         {
             RoutedEvent = Keyboard.PreviewKeyDownEvent
         };
         element.RaiseEvent(args);
         return args;
+    }
+
+    /// <summary>
+    /// Supplies deterministic key states without consulting the desktop keyboard.
+    /// </summary>
+    /// <param name="inputManager">The input manager belonging to the test's STA thread.</param>
+    private sealed class TestKeyboardDevice(InputManager inputManager) : KeyboardDevice(inputManager)
+    {
+        private Key _key;
+        private ModifierKeys _modifiers;
+
+        internal void SetPressedKeys(Key key, ModifierKeys modifiers)
+        {
+            _key = key;
+            _modifiers = modifiers;
+        }
+
+        /// <summary>
+        /// Returns only the key states explicitly supplied by the test.
+        /// </summary>
+        /// <param name="key">The key to inspect.</param>
+        /// <returns>Whether the simulated key is pressed.</returns>
+        protected override KeyStates GetKeyStatesFromSystem(Key key)
+        {
+            var modifier = key switch
+            {
+                Key.LeftCtrl or Key.RightCtrl => ModifierKeys.Control,
+                Key.LeftAlt or Key.RightAlt => ModifierKeys.Alt,
+                Key.LeftShift or Key.RightShift => ModifierKeys.Shift,
+                _ => ModifierKeys.None
+            };
+            return key == _key || (modifier != ModifierKeys.None && (_modifiers & modifier) != 0)
+                ? KeyStates.Down
+                : KeyStates.None;
+        }
     }
 
     /// <summary>

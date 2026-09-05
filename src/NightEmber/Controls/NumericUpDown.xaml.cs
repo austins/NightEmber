@@ -202,7 +202,7 @@ public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
 
     private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers != ModifierKeys.None)
+        if (e.KeyboardDevice.Modifiers != ModifierKeys.None)
         {
             return;
         }

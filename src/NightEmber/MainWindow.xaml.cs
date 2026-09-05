@@ -152,7 +152,7 @@ public sealed partial class MainWindow : Window
 
     private void ScheduleOptions_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers != ModifierKeys.None || e.OriginalSource is not RadioButton current)
+        if (e.KeyboardDevice.Modifiers != ModifierKeys.None || e.OriginalSource is not RadioButton current)
         {
             return;
         }
