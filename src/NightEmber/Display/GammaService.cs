@@ -34,7 +34,6 @@ internal sealed class GammaService : IGammaService
         _devices = devices;
     }
 
-    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)

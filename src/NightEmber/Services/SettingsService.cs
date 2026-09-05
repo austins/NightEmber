@@ -19,6 +19,10 @@ internal sealed class SettingsService
     {
     }
 
+    /// <summary>
+    /// Initializes a settings store at the supplied configuration path.
+    /// </summary>
+    /// <param name="configPath">The path used to load and save the portable JSON configuration.</param>
     public SettingsService(string configPath)
     {
         ConfigPath = configPath;

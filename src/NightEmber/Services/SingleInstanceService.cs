@@ -15,7 +15,6 @@ internal sealed class SingleInstanceService : IDisposable
     private RegisteredWaitHandle? _registeredWait;
     private bool _disposed;
 
-    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)

@@ -49,7 +49,6 @@ internal sealed class AppController : IDisposable
     private int _previewTemperature = ColorTemperature.NeutralKelvin;
     private int _previewBrightness = NeutralBrightnessPercent;
 
-    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)

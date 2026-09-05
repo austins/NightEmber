@@ -18,7 +18,6 @@ internal sealed class WatchdogService : IDisposable
     private Process? _watchdogProcess;
     private bool _disposed;
 
-    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)
@@ -46,7 +45,9 @@ internal sealed class WatchdogService : IDisposable
     /// </summary>
     /// <remarks>
     /// The child receives the main process ID and a randomly named event. It does
-    /// not initialize WPF UI or application services.
+    /// not create a settings window, tray icon, or controller. The shared WPF
+    /// application entry point still initializes application resources before
+    /// dispatching to watchdog mode.
     /// </remarks>
     public void Start()
     {

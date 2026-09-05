@@ -22,7 +22,7 @@ public sealed class SpinnerValidationTests
             var input = Input(control);
             var peer = UIElementAutomationPeer.CreatePeerForElement(input);
             input.Text = "invalid";
-            InputValidation.GetHasError(control).Should().BeFalse();
+            var errorBeforeCommit = InputValidation.GetHasError(control);
 
             // Act
             input.RaiseEvent(
@@ -33,6 +33,7 @@ public sealed class SpinnerValidationTests
             var committedAgain = Commit(control);
 
             // Assert
+            errorBeforeCommit.Should().BeFalse();
             input.Text.Should().Be("invalid");
             committedAgain.Should().BeFalse();
             InputValidation.GetHasError(control).Should().BeTrue();

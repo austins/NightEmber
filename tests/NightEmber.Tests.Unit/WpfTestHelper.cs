@@ -82,10 +82,8 @@ internal static class WpfTestHelper
     /// </summary>
     private sealed class TestPresentationSource : PresentationSource
     {
-        /// <inheritdoc />
         public override Visual RootVisual { get; set; } = null!;
 
-        /// <inheritdoc />
         public override bool IsDisposed => false;
 
         /// <summary>

@@ -35,7 +35,6 @@ internal sealed class TrayIconService : IDisposable
     private bool _keyboardMenuOpen;
     private bool _disposed;
 
-    /// <inheritdoc />
     public void Dispose()
     {
         if (_disposed)

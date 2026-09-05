@@ -13,7 +13,6 @@ public sealed partial class App : Application, IDisposable
     private WatchdogService? _watchdog;
     private AppController? _controller;
 
-    /// <inheritdoc />
     public void Dispose()
     {
         _controller?.Dispose();
@@ -27,7 +26,6 @@ public sealed partial class App : Application, IDisposable
         _singleInstance = null;
     }
 
-    /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -99,7 +97,6 @@ public sealed partial class App : Application, IDisposable
         controller.Initialize(hidden);
     }
 
-    /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
         Dispose();
