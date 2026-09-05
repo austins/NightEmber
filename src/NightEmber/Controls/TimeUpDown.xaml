@@ -12,9 +12,9 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <Border BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+    <Border BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}"
             BorderThickness="1"
-            Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+            Background="{DynamicResource TextControlBackground}">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -22,6 +22,8 @@
             </Grid.ColumnDefinitions>
 
             <TextBox x:Name="ValueTextBox"
+                     MinHeight="0"
+                     MinWidth="0"
                      BorderThickness="0"
                      Padding="5,0,4,0"
                      VerticalContentAlignment="Center"

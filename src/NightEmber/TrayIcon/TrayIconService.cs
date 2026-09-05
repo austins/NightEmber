@@ -43,6 +43,7 @@ internal sealed class TrayIconService : IDisposable
         _menu.IsOpen = false;
         _notifyIcon.ContextMenu = null;
         _menu.Items.Clear();
+        _menu.Resources.MergedDictionaries.Clear();
         _menu.ClearValue(FrameworkElement.DataContextProperty);
         _notifyIcon.Dispose();
         _onIcon?.Dispose();
@@ -88,6 +89,12 @@ internal sealed class TrayIconService : IDisposable
         _settingsItem = new MenuItem { Header = "Settings..." };
         _exitItem = new MenuItem { Header = "Exit" };
         _menu = new ContextMenu();
+        if (Application.Current is { } application)
+        {
+            // A detached tray popup needs resource-change notifications even while no settings window is open.
+            _menu.Resources.MergedDictionaries.Add(application.Resources);
+        }
+
         _menu.Items.Add(_toggleItem);
         _menu.Items.Add(new Separator());
         _menu.Items.Add(_settingsItem);

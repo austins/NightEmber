@@ -8,7 +8,7 @@ display's gamma ramp and runs quietly in the system tray.
 ## Features
 
 - Adjustable warmth from 6500 K down to 1200 K
-- Optional software dimming from 100% to 50%
+- Adjustable brightness from 100% (no dimming) down to 50%, using software dimming
 - Manual, sunset-to-sunrise, and custom-hour schedules
 - Offline sunrise and sunset estimates with no location permission or network access
 - Smooth, configurable transitions
@@ -16,6 +16,7 @@ display's gamma ramp and runs quietly in the system tray.
 - Automatic recovery after display changes, unlock, or resume
 - Gamma drift detection when another program resets a display
 - Tray toggle, settings window, and optional sign-in startup
+- Settings and tray-menu styling that follows the Windows light or dark app theme
 - Single-instance behavior
 - A cleanup watchdog that restores neutral gamma after an unexpected process exit
 - Portable settings stored beside the executable
@@ -27,7 +28,7 @@ display's gamma ramp and runs quietly in the system tray.
 3. Adjust the settings and select **Save**.
 4. Use the crescent moon in the system tray to toggle the effect, reopen settings, or exit.
 
-Warmth and software-dimming changes are previewed immediately and remain active while the settings window is open.
+Warmth and brightness changes are previewed immediately and remain active while the settings window is open.
 Select **Save** to keep them; select **Cancel** or close the window to restore the active saved state. Using the tray
 toggle while the window is open ends the preview and applies a manual override.
 
@@ -44,7 +45,7 @@ Settings are saved as `NightEmber.config.json` beside `NightEmber.exe`:
 | Setting       | Range                        | Default  | Purpose                         |
 |---------------|------------------------------|----------|---------------------------------|
 | `Temperature` | 1200-6500                    | `3400`   | Color temperature while enabled |
-| `Brightness`  | 50-100                       | `100`    | Software dimming percentage     |
+| `Brightness`  | 50-100                       | `100`    | Brightness percentage (100% = no dimming) |
 | `Mode`        | `Manual`, `Sunset`, `Custom` | `Sunset` | Scheduling mode                 |
 | `CustomOn`    | `HH:mm`                      | `21:00`  | Custom schedule start           |
 | `CustomOff`   | `HH:mm`                      | `07:00`  | Custom schedule end             |

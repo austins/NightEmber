@@ -8,6 +8,46 @@ namespace NightEmber.Tests.Unit.TrayIcon;
 
 public sealed class TrayIconServiceTests
 {
+    [Fact]
+    public async Task TrayMenu_ChangedTheme_UpdatesWithoutCreatingShellIcon()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
+            var menu = icon.ContextMenu;
+            var applicationResources = new ResourceDictionary();
+            menu.Resources.MergedDictionaries.Add(applicationResources);
+            var backgrounds = new List<System.Windows.Media.Brush>();
+            string[] themes = ["Light", "Dark", "HC"];
+
+            // Act
+            foreach (var theme in themes)
+            {
+                applicationResources.MergedDictionaries.Clear();
+                applicationResources.MergedDictionaries.Add(
+                    new ResourceDictionary
+                    {
+                        Source = new Uri(
+                            $"/PresentationFramework.Fluent;component/Themes/Fluent.{theme}.xaml",
+                            UriKind.Relative)
+                    });
+                menu.ApplyTemplate();
+                backgrounds.Add(menu.Background);
+
+                // Assert
+                menu.Background.Should().BeSameAs(menu.FindResource("ContextMenuBackground"));
+                menu.Foreground.Should().BeSameAs(menu.FindResource("ContextMenuForeground"));
+                menu.Template.Should().NotBeNull();
+                icon.IsCreated.Should().BeFalse();
+                menu.IsOpen.Should().BeFalse();
+            }
+
+            backgrounds[0].Should().NotBeSameAs(backgrounds[1]);
+        });
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("Night Ember off")]
@@ -155,6 +195,7 @@ public sealed class TrayIconServiceTests
             var callbacks = 0;
             using var service = new TrayIconService(icon, () => callbacks++, () => callbacks++, () => callbacks++);
             var menu = icon.ContextMenu;
+            menu.Resources.MergedDictionaries.Add(new ResourceDictionary());
             var items = menu.Items.OfType<MenuItem>().ToArray();
 
             // Act
@@ -175,6 +216,7 @@ public sealed class TrayIconServiceTests
             icon.ContextMenu.Should().BeNull();
             menu.IsOpen.Should().BeFalse();
             menu.Items.Count.Should().Be(0);
+            menu.Resources.MergedDictionaries.Should().BeEmpty();
             menu.DataContext.Should().BeNull();
             update.Should().Throw<ObjectDisposedException>();
             showError.Should().Throw<ObjectDisposedException>();

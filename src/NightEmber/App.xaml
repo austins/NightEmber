@@ -1,9 +1,10 @@
 ﻿<Application x:Class="NightEmber.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             ShutdownMode="OnExplicitShutdown">
+             ShutdownMode="OnExplicitShutdown"
+             ThemeMode="System">
     <Application.Resources>
-        <Style TargetType="Button">
+        <Style TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
             <Setter Property="Padding" Value="18,7" />
             <Setter Property="MinWidth" Value="82" />
         </Style>

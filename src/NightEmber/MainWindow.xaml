@@ -4,177 +4,208 @@
         xmlns:controls="clr-namespace:NightEmber.Controls"
         Title="Night Ember"
         Width="500"
-        Height="630"
+        Height="760"
         MinWidth="460"
         MinHeight="420"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResizeWithGrip"
         Icon="Resources/AppIcon.ico"
-        Background="#FFF7F3EE">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="28,22,28,24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,22">
-                <Viewbox Width="44"
-                         Height="44"
-                         Margin="0,0,14,0"
-                         Focusable="False"
-                         IsHitTestVisible="False">
-                    <Path Fill="#FFFFA83C">
-                        <Path.Data>
-                            <CombinedGeometry GeometryCombineMode="Exclude">
-                                <CombinedGeometry.Geometry1>
-                                    <EllipseGeometry Center="16,16" RadiusX="13" RadiusY="13" />
-                                </CombinedGeometry.Geometry1>
-                                <CombinedGeometry.Geometry2>
-                                    <EllipseGeometry Center="22,11" RadiusX="13" RadiusY="13" />
-                                </CombinedGeometry.Geometry2>
-                            </CombinedGeometry>
-                        </Path.Data>
-                    </Path>
-                </Viewbox>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Night Ember" FontSize="24" FontWeight="SemiBold" Foreground="#FF302B27" />
-                    <TextBlock Text="Warm, comfortable light after dark" Foreground="#FF6F655D" />
-                </StackPanel>
-            </StackPanel>
-
-            <StackPanel Grid.Row="1" Margin="0,0,0,18">
-                <DockPanel>
-                    <TextBlock x:Name="StrengthLabel" Text="Strength" FontWeight="SemiBold" />
-                    <TextBlock x:Name="StrengthValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
-                </DockPanel>
-                <TextBlock Text="Controls how warm the display looks. Higher values reduce more blue light."
-                           Foreground="#FF6F655D"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,3,0,0" />
-                <Slider x:Name="StrengthSlider"
-                        Minimum="0"
-                        Maximum="100"
-                        TickFrequency="10"
-                        IsSnapToTickEnabled="False"
-                        ValueChanged="PreviewSlider_ValueChanged"
-                        AutomationProperties.LabeledBy="{Binding ElementName=StrengthLabel}"
-                        AutomationProperties.HelpText="Controls how warm the display looks. Higher values reduce more blue light."
-                        Margin="0,8,0,0" />
-            </StackPanel>
-
-            <StackPanel Grid.Row="2" Margin="0,0,0,20">
-                <DockPanel>
-                    <TextBlock x:Name="BrightnessLabel" Text="Software dimming" FontWeight="SemiBold" />
-                    <TextBlock x:Name="BrightnessValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
-                </DockPanel>
-                <TextBlock Text="Darkens the image in software without changing the monitor's backlight."
-                           Foreground="#FF6F655D"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Margin="0,3,0,0" />
-                <Slider x:Name="BrightnessSlider"
-                        Minimum="50"
-                        Maximum="100"
-                        TickFrequency="10"
-                        IsSnapToTickEnabled="False"
-                        ValueChanged="PreviewSlider_ValueChanged"
-                        AutomationProperties.LabeledBy="{Binding ElementName=BrightnessLabel}"
-                        AutomationProperties.HelpText="Darkens the image in software without changing the monitor's backlight."
-                        Margin="0,8,0,0" />
-            </StackPanel>
-
-            <GroupBox Grid.Row="3" Header="Schedule" Padding="14,10" Margin="0,0,0,18">
-                <StackPanel>
-                    <RadioButton x:Name="ManualModeRadio"
-                                 Content="Never (manual only)"
-                                 GroupName="Schedule"
-                                 Checked="ScheduleMode_Checked"
-                                 Margin="0,2,0,8" />
-                    <RadioButton x:Name="SunsetModeRadio"
-                                 Content="Sunset to sunrise"
-                                 GroupName="Schedule"
-                                 Checked="ScheduleMode_Checked"
-                                 Margin="0,0,0,4" />
-                    <TextBlock x:Name="SunInfoText"
-                               Margin="22,0,0,12"
-                               Foreground="#FF6F655D"
-                               TextWrapping="Wrap" />
-                    <RadioButton x:Name="CustomModeRadio"
-                                 Content="Set hours"
-                                 GroupName="Schedule"
-                                 Checked="ScheduleMode_Checked"
-                                 Margin="0,0,0,8" />
-                    <Grid x:Name="CustomTimePanel" Margin="22,0,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="110" />
-                            <ColumnDefinition Width="22" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="110" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="CustomOnLabel"
-                                   Grid.Column="0"
-                                   Text="Turn on"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,8,0" />
-                        <controls:TimeUpDown x:Name="CustomOnInput"
-                                             Grid.Column="1"
-                                             MinuteIncrement="5"
-                                             AutomationProperties.LabeledBy="{Binding ElementName=CustomOnLabel}"
-                                             AutomationProperties.HelpText="Enter the time when Night Ember should turn on." />
-                        <TextBlock x:Name="CustomOffLabel"
-                                   Grid.Column="3"
-                                   Text="Turn off"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,8,0" />
-                        <controls:TimeUpDown x:Name="CustomOffInput"
-                                             Grid.Column="4"
-                                             MinuteIncrement="5"
-                                             AutomationProperties.LabeledBy="{Binding ElementName=CustomOffLabel}"
-                                             AutomationProperties.HelpText="Enter the time when Night Ember should turn off." />
-                    </Grid>
-                </StackPanel>
-            </GroupBox>
-
-            <Grid Grid.Row="4" Margin="0,0,0,22">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="110" />
-                </Grid.ColumnDefinitions>
+        Background="{DynamicResource WindowBackground}"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="28,22,28,16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <TextBlock x:Name="FadeDurationLabel"
-                           Text="Transition duration (0 to 5000 ms)"
-                           VerticalAlignment="Center" />
-                <controls:NumericUpDown x:Name="FadeDurationInput"
-                                        Grid.Row="0"
-                                        Grid.Column="1"
-                                        Minimum="0"
-                                        Maximum="5000"
-                                        Increment="50"
-                                        AutomationProperties.LabeledBy="{Binding ElementName=FadeDurationLabel}"
-                                        AutomationProperties.HelpText="Enter the transition duration in milliseconds."
-                                        VerticalAlignment="Center" />
-                <CheckBox x:Name="StartupCheckBox"
-                          Grid.Row="1"
-                          Grid.Column="0"
-                          Grid.ColumnSpan="2"
-                          Content="Start automatically when I sign in"
-                          Margin="0,16,0,0" />
-            </Grid>
 
-            <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,22">
+                    <Viewbox Width="44"
+                             Height="44"
+                             Margin="0,0,14,0"
+                             Focusable="False"
+                             IsHitTestVisible="False">
+                        <Path Fill="#FFFFA83C">
+                            <Path.Data>
+                                <CombinedGeometry GeometryCombineMode="Exclude">
+                                    <CombinedGeometry.Geometry1>
+                                        <EllipseGeometry Center="16,16" RadiusX="13" RadiusY="13" />
+                                    </CombinedGeometry.Geometry1>
+                                    <CombinedGeometry.Geometry2>
+                                        <EllipseGeometry Center="22,11" RadiusX="13" RadiusY="13" />
+                                    </CombinedGeometry.Geometry2>
+                                </CombinedGeometry>
+                            </Path.Data>
+                        </Path>
+                    </Viewbox>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Night Ember" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="Warm, comfortable light after dark"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,0,0,18">
+                    <DockPanel>
+                        <TextBlock x:Name="StrengthLabel" Text="Strength" FontWeight="SemiBold" />
+                        <TextBlock x:Name="StrengthValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
+                    </DockPanel>
+                    <TextBlock Text="Controls how warm the display looks. Higher values reduce more blue light."
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Margin="0,3,0,0" />
+                    <Slider x:Name="StrengthSlider"
+                            Minimum="0"
+                            Maximum="100"
+                            TickFrequency="10"
+                            IsSnapToTickEnabled="False"
+                            ValueChanged="PreviewSlider_ValueChanged"
+                            AutomationProperties.LabeledBy="{Binding ElementName=StrengthLabel}"
+                            AutomationProperties.HelpText="Controls how warm the display looks. Higher values reduce more blue light."
+                            Margin="0,8,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Margin="0,0,0,20">
+                    <DockPanel>
+                        <TextBlock x:Name="BrightnessLabel" Text="Brightness" FontWeight="SemiBold" />
+                        <TextBlock x:Name="BrightnessValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
+                    </DockPanel>
+                    <TextBlock Text="Darkens the image in software without changing the monitor's backlight."
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Margin="0,3,0,0" />
+                    <Slider x:Name="BrightnessSlider"
+                            Minimum="50"
+                            Maximum="100"
+                            TickFrequency="10"
+                            IsSnapToTickEnabled="False"
+                            ValueChanged="PreviewSlider_ValueChanged"
+                            AutomationProperties.LabeledBy="{Binding ElementName=BrightnessLabel}"
+                            AutomationProperties.HelpText="Darkens the image in software without changing the monitor's backlight."
+                            Margin="0,8,0,0" />
+                </StackPanel>
+
+                <GroupBox Grid.Row="3" Header="Schedule" Padding="0" Margin="0,0,0,18">
+                    <GroupBox.Resources>
+                    </GroupBox.Resources>
+                    <GroupBox.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}"
+                                       FontSize="{DynamicResource ControlContentThemeFontSize}"
+                                       FontWeight="SemiBold" />
+                        </DataTemplate>
+                    </GroupBox.HeaderTemplate>
+                    <StackPanel>
+                        <RadioButton x:Name="ManualModeRadio"
+                                     Content="Never (manual only)"
+                                     GroupName="Schedule"
+                                     Checked="ScheduleMode_Checked"
+                                     Margin="0,0,0,4" />
+                        <RadioButton x:Name="SunsetModeRadio"
+                                     Content="Sunset to sunrise"
+                                     GroupName="Schedule"
+                                     Checked="ScheduleMode_Checked"
+                                     Margin="0,0,0,4" />
+                        <TextBlock x:Name="SunInfoText"
+                                   Margin="22,0,0,12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   TextWrapping="Wrap" />
+                        <RadioButton x:Name="CustomModeRadio"
+                                     Content="Set hours"
+                                     GroupName="Schedule"
+                                     Checked="ScheduleMode_Checked"
+                                     Margin="0,0,0,8" />
+                        <Grid x:Name="CustomTimePanel" Margin="22,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="22" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="110" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="CustomOnLabel"
+                                       Grid.Column="0"
+                                       Text="Turn on"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <controls:TimeUpDown x:Name="CustomOnInput"
+                                                 Grid.Column="1"
+                                                 MinuteIncrement="5"
+                                                 AutomationProperties.LabeledBy="{Binding ElementName=CustomOnLabel}"
+                                                 AutomationProperties.HelpText="Enter the time when Night Ember should turn on." />
+                            <TextBlock x:Name="CustomOffLabel"
+                                       Grid.Column="3"
+                                       Text="Turn off"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0" />
+                            <controls:TimeUpDown x:Name="CustomOffInput"
+                                                 Grid.Column="4"
+                                                 MinuteIncrement="5"
+                                                 AutomationProperties.LabeledBy="{Binding ElementName=CustomOffLabel}"
+                                                 AutomationProperties.HelpText="Enter the time when Night Ember should turn off." />
+                        </Grid>
+                    </StackPanel>
+                </GroupBox>
+
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="110" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock x:Name="FadeDurationLabel"
+                               Text="Transition duration (0 to 5000 ms)"
+                               VerticalAlignment="Center" />
+                    <controls:NumericUpDown x:Name="FadeDurationInput"
+                                            Grid.Row="0"
+                                            Grid.Column="1"
+                                            Minimum="0"
+                                            Maximum="5000"
+                                            Increment="50"
+                                            AutomationProperties.LabeledBy="{Binding ElementName=FadeDurationLabel}"
+                                            AutomationProperties.HelpText="Enter the transition duration in milliseconds."
+                                            VerticalAlignment="Center" />
+                    <CheckBox x:Name="StartupCheckBox"
+                              Grid.Row="1"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="2"
+                              Content="Start automatically when I sign in"
+                              Margin="0,16,0,0" />
+                </Grid>
+
+            </Grid>
+        </ScrollViewer>
+        <Grid Grid.Row="1" Margin="28,12,28,24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="Warmth and brightness preview immediately. Save to keep your changes."
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       Margin="0,0,16,0" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right"
+                        VerticalAlignment="Center">
                 <Button Content="Cancel" IsCancel="True" Click="CancelButton_Click" Margin="0,0,10,0" />
-                <Button Content="Save" IsDefault="True" Click="SaveButton_Click" />
+                <Button Content="Save" IsDefault="True" Click="SaveButton_Click"
+                        Style="{DynamicResource AccentButtonStyle}" Padding="18,7" MinWidth="82" />
             </StackPanel>
         </Grid>
-    </ScrollViewer>
+    </Grid>
 </Window>
