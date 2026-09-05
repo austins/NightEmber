@@ -12,10 +12,11 @@ namespace NightEmber.Tests.Unit;
 /// WPF controls require a single-threaded apartment. This helper supplies an STA thread
 /// and synthetic routed keyboard events without requiring a visible window or injecting OS keyboard input.
 /// Actions are serialized because WPF's shared XAML metadata can be initialized by multiple control types.
+/// Callers wait asynchronously before creating an STA thread, rather than blocking new threads on a lock.
 /// </remarks>
 internal static class WpfTestHelper
 {
-    private static readonly Lock ExecutionLock = new();
+    private static readonly SemaphoreSlim ExecutionGate = new(1, 1);
 
     [ThreadStatic]
     private static TestKeyboardDevice? _keyboardDevice;
@@ -29,36 +30,17 @@ internal static class WpfTestHelper
     /// This method does not run a dispatcher message loop. Tests must not depend on queued dispatcher work
     /// or real-time timer ticks being processed during the action.
     /// </remarks>
-    public static Task RunAsync(Action action)
+    public static async Task RunAsync(Action action)
     {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var thread = new Thread(() =>
+        await ExecutionGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            try
-            {
-                lock (ExecutionLock)
-                {
-                    try
-                    {
-                        action();
-                    }
-                    finally
-                    {
-                        _keyboardDevice = null;
-                        Dispatcher.CurrentDispatcher.InvokeShutdown();
-                    }
-                }
-
-                completion.SetResult();
-            }
-            catch (Exception ex)
-            {
-                completion.SetException(ex);
-            }
-        }) { IsBackground = true };
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return completion.Task;
+            await RunOnStaThreadAsync(action).ConfigureAwait(false);
+        }
+        finally
+        {
+            ExecutionGate.Release();
+        }
     }
 
     /// <summary>
@@ -82,6 +64,35 @@ internal static class WpfTestHelper
         };
         element.RaiseEvent(args);
         return args;
+    }
+
+    private static Task RunOnStaThreadAsync(Action action)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    _keyboardDevice = null;
+                    Dispatcher.CurrentDispatcher.InvokeShutdown();
+                }
+
+                completion.SetResult();
+            }
+            catch (Exception ex)
+            {
+                completion.SetException(ex);
+            }
+        }) { IsBackground = true };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return completion.Task;
     }
 
     /// <summary>
