@@ -5,11 +5,85 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace NightEmber.Tests.Unit.TrayIcon;
 
 public sealed class TrayIconServiceTests
 {
+    [Fact]
+    public async Task TrayMenu_IdleWarmup_PreparesLayoutWithoutOpeningOrChangingFocus()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
+            var menu = icon.ContextMenu;
+            menu.Resources.MergedDictionaries.Add(
+                new ResourceDictionary
+                {
+                    Source = new Uri(
+                        "/PresentationFramework.Fluent;component/Themes/Fluent.Dark.xaml",
+                        UriKind.Relative)
+                });
+            var opened = 0;
+            menu.Opened += (_, _) => opened++;
+            var originalFocus = Keyboard.FocusedElement;
+            var initialSize = menu.DesiredSize;
+
+            // Act
+            ProcessIdleWork(menu.Dispatcher);
+
+            // Assert
+            initialSize.Should().Be(default(Size));
+            menu.DesiredSize.Width.Should().BeGreaterThan(0);
+            menu.DesiredSize.Height.Should().BeGreaterThan(0);
+            menu.IsMeasureValid.Should().BeTrue();
+            menu.IsArrangeValid.Should().BeTrue();
+            menu.Items.OfType<Control>().Should().OnlyContain(item => item.Template != null);
+            opened.Should().Be(0);
+            menu.IsOpen.Should().BeFalse();
+            PresentationSource.FromVisual(menu).Should().BeNull();
+            Keyboard.FocusedElement.Should().BeSameAs(originalFocus);
+            icon.IsCreated.Should().BeFalse();
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TrayMenu_OpenedOrDisposedBeforeIdle_CancelsWarmup(bool dispose)
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
+            var menu = icon.ContextMenu;
+
+            // Act
+            if (dispose)
+            {
+                service.Dispose();
+            }
+            else
+            {
+                menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
+                menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
+            }
+
+            ProcessIdleWork(menu.Dispatcher);
+
+            // Assert
+            menu.DesiredSize.Should().Be(default(Size));
+            menu.IsOpen.Should().BeFalse();
+            PresentationSource.FromVisual(menu).Should().BeNull();
+            icon.IsCreated.Should().BeFalse();
+        });
+    }
+
     [Fact]
     public async Task TrayMenu_ChangedTheme_UpdatesWithoutCreatingShellIcon()
     {
@@ -25,6 +99,7 @@ public sealed class TrayIconServiceTests
             string[] themes = ["Light", "Dark", "HC"];
 
             // Act
+            ProcessIdleWork(menu.Dispatcher);
             foreach (var theme in themes)
             {
                 applicationResources.MergedDictionaries.Clear();
@@ -463,5 +538,12 @@ public sealed class TrayIconServiceTests
             update.Should().Throw<ObjectDisposedException>();
             showError.Should().Throw<ObjectDisposedException>();
         });
+    }
+
+    private static void ProcessIdleWork(Dispatcher dispatcher)
+    {
+#pragma warning disable VSTHRD001 // Explicitly drain queued preparation on the owning STA thread without sleeps.
+        dispatcher.Invoke(static () => { }, DispatcherPriority.ApplicationIdle);
+#pragma warning restore VSTHRD001
     }
 }

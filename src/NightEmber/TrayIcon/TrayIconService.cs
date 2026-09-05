@@ -32,6 +32,7 @@ internal sealed class TrayIconService : IDisposable
     private readonly Icon _onIcon;
     private readonly Icon _offIcon;
     private DispatcherOperation? _focusOperation;
+    private DispatcherOperation? _menuPreparation;
     private bool _keyboardMenuOpen;
     private bool _disposed;
 
@@ -49,6 +50,7 @@ internal sealed class TrayIconService : IDisposable
         _menu.Opened -= OnMenuOpened;
         _menu.Closed -= OnMenuClosed;
         CancelMenuFocus();
+        CancelMenuPreparation();
         _toggleItem.Click -= OnToggle;
         _settingsItem.Click -= OnShowSettings;
         _exitItem.Click -= OnExit;
@@ -157,6 +159,10 @@ internal sealed class TrayIconService : IDisposable
             // Icon's property setter disposes the previous value. UpdateIcon borrows
             // the handle instead, so both cached moon icons remain owned by this service.
             _notifyIcon.UpdateIcon(_offIcon);
+
+#pragma warning disable VSTHRD001 // Prepare on the owning dispatcher after higher-priority startup and input work.
+            _menuPreparation = _menu.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, PrepareMenu);
+#pragma warning restore VSTHRD001
         }
         catch
         {
@@ -276,10 +282,38 @@ internal sealed class TrayIconService : IDisposable
 
     private void OnMenuOpened(object sender, RoutedEventArgs e)
     {
+        CancelMenuPreparation();
         if (_keyboardMenuOpen)
         {
             _focusFirstMenuItem();
         }
+    }
+
+    private void PrepareMenu()
+    {
+        _menuPreparation = null;
+        if (_disposed || _menu.IsOpen)
+        {
+            return;
+        }
+
+        // Reduce first-open latency by preparing the menu's templates and layout at idle,
+        // without opening a popup window or changing focus.
+        _menu.ApplyTemplate();
+        foreach (var item in _menu.Items.OfType<Control>())
+        {
+            item.ApplyTemplate();
+        }
+
+        _menu.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+        _menu.Arrange(new Rect(_menu.DesiredSize));
+        _menu.UpdateLayout();
+    }
+
+    private void CancelMenuPreparation()
+    {
+        _menuPreparation?.Abort();
+        _menuPreparation = null;
     }
 
     private void FocusFirstMenuItem()
