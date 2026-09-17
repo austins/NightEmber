@@ -3,6 +3,7 @@
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
         <TargetFramework>net10.0-windows</TargetFramework>
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
         <AnalysisLevel>10.0-All</AnalysisLevel>
         <Features>strict</Features>
         <Nullable>enable</Nullable>
