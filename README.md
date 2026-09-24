@@ -14,6 +14,7 @@ display's gamma ramp and runs quietly in the system tray.
 - Smooth, configurable transitions
 - Multi-monitor support
 - Automatic recovery after display changes, unlock, or resume
+- Schedule updates when the Windows time or time zone changes
 - Gamma drift detection when another program resets a display
 - Tray toggle, settings window, and optional sign-in startup
 - Settings and tray-menu styling that follows the Windows light or dark app theme
@@ -37,23 +38,6 @@ from the tray menu to stop the application and restore neutral display gamma.
 
 A manual tray toggle temporarily overrides an active schedule. The override expires when the schedule next changes
 naturally.
-
-## Verify a download
-
-Each release includes `NightEmber.exe.sha256` and a GitHub build-provenance attestation. To confirm the file is intact,
-compare its hash with the value in `NightEmber.exe.sha256`:
-
-```powershell
-(Get-FileHash .\NightEmber.exe -Algorithm SHA256).Hash
-```
-
-To confirm the file was built by this repository's release workflow, use the GitHub CLI:
-
-```powershell
-gh attestation verify .\NightEmber.exe --repo austins/NightEmber
-```
-
-The executable is not code-signed, so Windows SmartScreen may still warn about an unknown publisher.
 
 ## Keyboard access
 
@@ -124,6 +108,23 @@ folder with the `--hidden` option. Clearing the setting removes that shortcut. N
 Only one Night Ember startup shortcut exists per user. The setting shows as enabled only when that shortcut launches the
 copy you are configuring; clearing it leaves a shortcut that launches another existing copy untouched. A shortcut that
 points to a moved or deleted copy is replaced or removed.
+
+## Verify a download
+
+Each release includes `NightEmber.exe.sha256` and a GitHub build-provenance attestation. To confirm the file is intact,
+compare its hash with the value in `NightEmber.exe.sha256`:
+
+```powershell
+(Get-FileHash .\NightEmber.exe -Algorithm SHA256).Hash
+```
+
+To confirm the file was built by this repository's release workflow, use the GitHub CLI:
+
+```powershell
+gh attestation verify .\NightEmber.exe --repo austins/NightEmber
+```
+
+The executable is not code-signed, so Windows SmartScreen may still warn about an unknown publisher.
 
 ## Build
 
