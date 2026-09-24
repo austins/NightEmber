@@ -5,11 +5,11 @@ namespace NightEmber.Tests.Unit.Display;
 public sealed class ColorTemperatureTests
 {
     [Theory]
-    [InlineData(1000, 1, 0.2663545845, 0)]
-    [InlineData(3400, 1, 0.7437268370, 0.5300863277)]
-    [InlineData(6500, 1, 0.9965101328, 0.9805565033)]
+    [InlineData(1000, 1, 0.2672873820, 0)]
+    [InlineData(3400, 1, 0.7463314345, 0.5405974320)]
+    [InlineData(6500, 1, 1, 1)]
     [InlineData(6600, 1, 1, 1)]
-    [InlineData(40000, 0.5948014943, 0.7275657511, 1)]
+    [InlineData(40000, 0.5948014943, 0.7301137511, 1)]
     public void ToRgb_KnownTemperature_ReturnsExpectedMultipliers(double kelvin, double red, double green, double blue)
     {
         // Act
@@ -19,6 +19,16 @@ public sealed class ColorTemperatureTests
         result.Red.Should().BeApproximately(red, 0.0000001);
         result.Green.Should().BeApproximately(green, 0.0000001);
         result.Blue.Should().BeApproximately(blue, 0.0000001);
+    }
+
+    [Fact]
+    public void ToRgb_NeutralTemperature_ReturnsIdentityMultipliers()
+    {
+        // Act
+        var result = ColorTemperature.ToRgb(ColorTemperature.NeutralKelvin);
+
+        // Assert
+        result.Should().Be(new RgbMultipliers(1, 1, 1));
     }
 
     [Theory]
@@ -40,7 +50,7 @@ public sealed class ColorTemperatureTests
 
     [Theory]
     [InlineData(1000)]
-    [InlineData(1200)]
+    [InlineData(1900)]
     [InlineData(3400)]
     [InlineData(6500)]
     [InlineData(6600)]

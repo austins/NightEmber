@@ -72,6 +72,26 @@ internal static class ScheduleService
     }
 
     /// <summary>
+    /// Resolves the desired tint state, clearing a manual override when the schedule changes state.
+    /// </summary>
+    /// <param name="manualOverride">The user's temporary tint state, or null to follow the schedule.</param>
+    /// <param name="lastScheduledState">The previous scheduled state, or null before the first evaluation.</param>
+    /// <param name="scheduledState">The newly evaluated scheduled state.</param>
+    /// <returns>The desired tint state and the manual override that remains in effect.</returns>
+    public static (bool DesiredState, bool? ManualOverride) ResolveOverride(
+        bool? manualOverride,
+        bool? lastScheduledState,
+        bool scheduledState)
+    {
+        if (manualOverride is not null && lastScheduledState is not null && scheduledState != lastScheduledState)
+        {
+            manualOverride = null;
+        }
+
+        return (manualOverride ?? scheduledState, manualOverride);
+    }
+
+    /// <summary>
     /// Gets sunrise and sunset estimates for a local calendar date.
     /// </summary>
     /// <param name="date">The local date to calculate.</param>

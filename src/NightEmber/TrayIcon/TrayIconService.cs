@@ -34,6 +34,8 @@ internal sealed class TrayIconService : IDisposable
     private DispatcherOperation? _focusOperation;
     private DispatcherOperation? _menuPreparation;
     private bool _keyboardMenuOpen;
+    private bool? _lastIsOn;
+    private string? _lastTooltip;
     private bool _disposed;
 
     public void Dispose()
@@ -60,8 +62,8 @@ internal sealed class TrayIconService : IDisposable
         _menu.Resources.MergedDictionaries.Clear();
         _menu.ClearValue(FrameworkElement.DataContextProperty);
         _notifyIcon.Dispose();
-        _onIcon?.Dispose();
-        _offIcon?.Dispose();
+        _onIcon.Dispose();
+        _offIcon.Dispose();
     }
 
     /// <summary>
@@ -179,12 +181,22 @@ internal sealed class TrayIconService : IDisposable
     public void Update(bool isOn, string tooltip)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        tooltip = TrimTooltip(tooltip);
+
+        // The schedule poll refreshes the tray every few seconds; skip redundant shell updates.
+        if (_lastIsOn == isOn && string.Equals(_lastTooltip, tooltip, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastIsOn = isOn;
+        _lastTooltip = tooltip;
         _notifyIcon.UpdateIcon(isOn ? _onIcon : _offIcon);
         _toggleItem.Header = isOn ? "_Turn off now" : "_Turn on now";
         AutomationProperties.SetName(_toggleItem, isOn ? "Turn off now" : "Turn on now");
         AutomationProperties.SetItemStatus(_toggleItem, isOn ? "Tint on" : "Tint off");
         AutomationProperties.SetItemStatus(_notifyIcon, isOn ? "Tint on" : "Tint off");
-        _notifyIcon.ToolTipText = TrimTooltip(tooltip);
+        _notifyIcon.ToolTipText = tooltip;
     }
 
     /// <summary>

@@ -20,7 +20,7 @@ internal static class GammaRampBuilder
     /// <summary>
     /// The lowest channel multiplier accepted reliably by Windows display drivers.
     /// </summary>
-    public const double DriverMinimumMultiplier = 0.5;
+    private const double DriverMinimumMultiplier = 0.5;
 
     private const double RampStep = ushort.MaxValue / (RampLength - 1.0);
 
@@ -32,7 +32,8 @@ internal static class GammaRampBuilder
     /// <param name="blue">The normalized blue-channel multiplier.</param>
     /// <param name="brightness">The normalized brightness multiplier.</param>
     /// <param name="clampToDriverFloor">
-    /// Whether to clamp each combined multiplier to the minimum accepted reliably by display drivers.
+    /// Whether to keep every channel multiplier at or above the minimum accepted reliably by display drivers.
+    /// Brightness then dims only the range above that floor.
     /// </param>
     /// <returns>A newly allocated gamma ramp.</returns>
     public static ushort[] Build(double red, double green, double blue, double brightness, bool clampToDriverFloor)
@@ -51,7 +52,8 @@ internal static class GammaRampBuilder
     /// <param name="blue">The normalized blue-channel multiplier.</param>
     /// <param name="brightness">The normalized brightness multiplier.</param>
     /// <param name="clampToDriverFloor">
-    /// Whether to clamp each combined multiplier to the minimum accepted reliably by display drivers.
+    /// Whether to keep every channel multiplier at or above the minimum accepted reliably by display drivers.
+    /// Brightness then dims only the range above that floor.
     /// </param>
     /// <exception cref="ArgumentException">
     /// Thrown when <paramref name="ramp" /> contains fewer than <see cref="RampElementCount" /> entries.
@@ -69,14 +71,10 @@ internal static class GammaRampBuilder
             throw new ArgumentException($"A gamma ramp requires at least {RampElementCount} entries.", nameof(ramp));
         }
 
-        red *= brightness;
-        green *= brightness;
-        blue *= brightness;
-
         var minimum = clampToDriverFloor ? DriverMinimumMultiplier : 0;
-        red = Math.Clamp(red, minimum, 1);
-        green = Math.Clamp(green, minimum, 1);
-        blue = Math.Clamp(blue, minimum, 1);
+        red = Dim(red, brightness, minimum);
+        green = Dim(green, brightness, minimum);
+        blue = Dim(blue, brightness, minimum);
 
         for (var index = 0; index < RampLength; index++)
         {
@@ -87,8 +85,18 @@ internal static class GammaRampBuilder
         }
     }
 
+    private static double Dim(double channel, double brightness, double floor)
+    {
+        channel = Math.Clamp(channel, floor, 1);
+        brightness = Math.Clamp(brightness, floor, 1);
+
+        // Dimming scales only the headroom above the driver floor, so channels that differ
+        // before dimming stay distinguishable instead of collapsing onto the floor together.
+        return floor + (channel - floor) * (brightness - floor) / (1 - floor);
+    }
+
     private static ushort ToUShort(double value)
     {
-        return (ushort)Math.Clamp(value, ushort.MinValue, ushort.MaxValue);
+        return (ushort)Math.Round(Math.Clamp(value, ushort.MinValue, ushort.MaxValue));
     }
 }

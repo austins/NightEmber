@@ -6,10 +6,12 @@ namespace NightEmber.Display;
 internal static class ColorTemperature
 {
     /// <summary>
-    /// The temperature in Kelvin at which the conversion curve produces an identity ramp.
+    /// The temperature in Kelvin at which the conversion produces an identity ramp.
     /// </summary>
-    /// <remarks>The user interface supports temperatures up to 6500 K.</remarks>
-    public const int NeutralKelvin = 6600;
+    /// <remarks>
+    /// Matches the sRGB D65 white point and the warmest-to-neutral upper bound in the user interface.
+    /// </remarks>
+    public const int NeutralKelvin = 6500;
 
     private const int MinimumKelvin = 1000;
     private const int MaximumKelvin = 40000;
@@ -29,6 +31,8 @@ internal static class ColorTemperature
     private const int BlueLogOffset = 10;
     private const double BlueLogAdjustment = 305.0447927307;
 
+    private static readonly RgbMultipliers NeutralCurve = EvaluateCurve(NeutralKelvin);
+
     /// <summary>
     /// Converts a color temperature to gamma-ramp channel multipliers.
     /// </summary>
@@ -37,10 +41,20 @@ internal static class ColorTemperature
     /// <remarks>
     /// Uses Tanner Helland's empirical curve fit to black-body radiation:
     /// <see href="https://tannerhelland.com/2012/09/18/convert-temperature-rgb-algorithm-code.html" />.
-    /// The fitted coefficients retain their published precision. Inputs outside
-    /// the supported mathematical range are clamped before evaluation.
+    /// The fitted coefficients retain their published precision. The curve is normalized so
+    /// <see cref="NeutralKelvin" /> maps exactly to white; hotter inputs saturate at white.
+    /// Inputs outside the supported mathematical range are clamped before evaluation.
     /// </remarks>
     public static RgbMultipliers ToRgb(double kelvin)
+    {
+        var curve = EvaluateCurve(kelvin);
+        return new RgbMultipliers(
+            Math.Min(curve.Red / NeutralCurve.Red, 1),
+            Math.Min(curve.Green / NeutralCurve.Green, 1),
+            Math.Min(curve.Blue / NeutralCurve.Blue, 1));
+    }
+
+    private static RgbMultipliers EvaluateCurve(double kelvin)
     {
         var temperature = Math.Clamp(kelvin, MinimumKelvin, MaximumKelvin) / KelvinScale;
 

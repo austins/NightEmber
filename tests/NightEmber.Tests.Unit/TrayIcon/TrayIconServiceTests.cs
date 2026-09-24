@@ -430,6 +430,28 @@ public sealed class TrayIconServiceTests
         });
     }
 
+    [Fact]
+    public async Task Update_UnchangedState_SkipsRedundantShellUpdate()
+    {
+        await WpfTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            using var icon = new TaskbarIcon();
+            using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
+            service.Update(true, "Night Ember on");
+            icon.ToolTipText = "externally changed";
+
+            // Act
+            service.Update(true, "Night Ember on");
+            var tooltipAfterDuplicate = icon.ToolTipText;
+            service.Update(true, "Night Ember on - next change");
+
+            // Assert
+            tooltipAfterDuplicate.Should().Be("externally changed");
+            icon.ToolTipText.Should().Be("Night Ember on - next change");
+        });
+    }
+
     [Theory]
     [InlineData(true, "Turn off now", "Tint on")]
     [InlineData(false, "Turn on now", "Tint off")]

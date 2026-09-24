@@ -11,7 +11,7 @@ internal sealed class AppSettings
     /// <summary>
     /// The lowest supported color temperature in Kelvin.
     /// </summary>
-    public const int MinimumTemperature = 1200;
+    public const int MinimumTemperature = 1900;
 
     /// <summary>
     /// The highest supported color temperature in Kelvin.
@@ -32,6 +32,10 @@ internal sealed class AppSettings
     /// The longest supported transition duration in milliseconds.
     /// </summary>
     public const int MaximumFadeMilliseconds = 5000;
+
+    // Earlier versions accepted temperatures down to 1200 K, which display drivers render
+    // identically to 1900 K. Such saved values are raised to the new minimum rather than reset.
+    private const int LegacyMinimumTemperature = 1200;
 
     /// <summary>
     /// Gets or initializes the active color temperature in Kelvin.
@@ -97,8 +101,7 @@ internal sealed class AppSettings
 
         return new AppSettings
         {
-            Temperature =
-                IsInRange(Temperature, MinimumTemperature, MaximumTemperature) ? Temperature : defaults.Temperature,
+            Temperature = NormalizeTemperature(Temperature, defaults.Temperature),
             Brightness =
                 IsInRange(Brightness, MinimumBrightness, MaximumBrightness) ? Brightness : defaults.Brightness,
             Mode = Enum.IsDefined(Mode) ? Mode : defaults.Mode,
@@ -127,6 +130,16 @@ internal sealed class AppSettings
     public static string FormatTime(TimeSpan value)
     {
         return DateTime.Today.Add(value).ToString("HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    private static int NormalizeTemperature(int value, int fallback)
+    {
+        if (IsInRange(value, MinimumTemperature, MaximumTemperature))
+        {
+            return value;
+        }
+
+        return IsInRange(value, LegacyMinimumTemperature, MinimumTemperature) ? MinimumTemperature : fallback;
     }
 
     private static bool IsInRange(int value, int minimum, int maximum)

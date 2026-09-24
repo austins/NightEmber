@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -10,6 +10,7 @@
         <Description>A portable night-light application for Windows.</Description>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
+        <StartupObject>NightEmber.Program</StartupObject>
     </PropertyGroup>
 
     <ItemGroup>

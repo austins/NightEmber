@@ -10,7 +10,9 @@ jobs:
     deploy:
         needs: test
         permissions:
+            attestations: write
             contents: write
+            id-token: write
         environment: release
         runs-on: windows-latest
         env:
@@ -35,7 +37,16 @@ jobs:
             -   uses: ./.github/actions/setup-dotnet-environment
             -   name: Publish executable
                 run: dotnet publish ./src/NightEmber -c Release /p:PublishProfile=win-x64 /p:RestoreLockedMode=true /p:Version=$env:VERSION
-            -   name: Upload release asset
-                run: gh release upload "$env:RELEASE_TAG" ./src/NightEmber/bin/publish/win-x64/NightEmber.exe --clobber
+            -   name: Write checksum
+                working-directory: ./src/NightEmber/bin/publish/win-x64
+                run: |
+                    $hash = (Get-FileHash -Algorithm SHA256 NightEmber.exe).Hash.ToLowerInvariant()
+                    [System.IO.File]::WriteAllText("$PWD/NightEmber.exe.sha256", "$hash  NightEmber.exe`n")
+            -   name: Attest build provenance
+                uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+                with:
+                    subject-path: ./src/NightEmber/bin/publish/win-x64/NightEmber.exe
+            -   name: Upload release assets
+                run: gh release upload "$env:RELEASE_TAG" ./src/NightEmber/bin/publish/win-x64/NightEmber.exe ./src/NightEmber/bin/publish/win-x64/NightEmber.exe.sha256 --clobber
                 env:
                     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

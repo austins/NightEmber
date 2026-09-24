@@ -70,6 +70,11 @@ internal sealed class AppControllerRuntime(Dispatcher dispatcher) : IAppControll
 #pragma warning restore VSTHRD001
     }
 
+    public void RefreshTimeZone()
+    {
+        TimeZoneInfo.ClearCachedData();
+    }
+
     private sealed class ControllerTimer(DispatcherTimer timer) : IControllerTimer
     {
         public void Start()
@@ -160,6 +165,11 @@ internal interface IAppControllerRuntime
     /// </summary>
     /// <param name="action">The action to execute.</param>
     public void Invoke(Action action);
+
+    /// <summary>
+    /// Discards cached time-zone data so local time reflects the current Windows time zone.
+    /// </summary>
+    public void RefreshTimeZone();
 }
 
 /// <summary>

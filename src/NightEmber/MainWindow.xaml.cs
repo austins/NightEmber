@@ -8,13 +8,14 @@ using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace NightEmber;
 
 /// <summary>
 /// Provides the settings window for configuring and previewing Night Ember.
 /// </summary>
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow
 {
     private const int MinimumStrength = 0;
     private const int MaximumStrength = 100;
@@ -27,6 +28,7 @@ public sealed partial class MainWindow : Window
     private int _originalTemperature;
     private bool _saved;
     private bool _showScheduleValidation;
+    private DispatcherOperation? _pendingPreview;
 
     /// <summary>
     /// Initializes the settings window from the active application state.
@@ -58,7 +60,6 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// Determines whether a custom schedule can ever change state.
     /// </summary>
-    /// <param name="isCustomMode">Whether the custom schedule is selected.</param>
     /// <param name="on">The configured activation time.</param>
     /// <param name="off">The configured deactivation time.</param>
     /// <returns><see langword="true" /> when the schedule is usable.</returns>
@@ -66,9 +67,9 @@ public sealed partial class MainWindow : Window
     /// Matching times describe a zero-length window, which never activates and
     /// never produces a next-change boundary.
     /// </remarks>
-    internal static bool IsCustomWindowValid(bool isCustomMode, TimeSpan on, TimeSpan off)
+    internal static bool IsCustomWindowValid(TimeSpan on, TimeSpan off)
     {
-        return !isCustomMode || AppSettings.FormatTime(on) != AppSettings.FormatTime(off);
+        return AppSettings.FormatTime(on) != AppSettings.FormatTime(off);
     }
 
     internal static AppSettings BuildSettings(
@@ -137,6 +138,17 @@ public sealed partial class MainWindow : Window
         }
 
         UpdatePreviewLabels();
+
+        // Slider drags raise many value changes per frame; applying only the latest value once
+        // input and rendering are processed avoids a gamma write for every intermediate step.
+#pragma warning disable VSTHRD001, VSTHRD110 // WPF owns this dispatcher; previews are intentionally fire-and-forget.
+        _pendingPreview ??= Dispatcher.BeginInvoke(DispatcherPriority.Background, ApplyPreview);
+#pragma warning restore VSTHRD001, VSTHRD110
+    }
+
+    private void ApplyPreview()
+    {
+        _pendingPreview = null;
         _controller.Preview(
             StrengthToTemperature((int)Math.Round(StrengthSlider.Value)),
             (int)Math.Round(BrightnessSlider.Value));
@@ -225,6 +237,8 @@ public sealed partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        _pendingPreview?.Abort();
+        _pendingPreview = null;
         if (!_saved)
         {
             _controller.CancelPreview();
@@ -253,11 +267,11 @@ public sealed partial class MainWindow : Window
         var onValid = !custom || CustomOnInput.CommitEdit();
         var offValid = !custom || CustomOffInput.CommitEdit();
         var durationValid = FadeDurationInput.CommitEdit();
-        UpdateScheduleValidation();
+        var scheduleValid = UpdateScheduleValidation();
 
-        UserControl? invalidInput = !onValid ? CustomOnInput :
-            !offValid || ScheduleErrorText.Text.Length > 0 ? CustomOffInput :
-            !durationValid ? FadeDurationInput : null;
+        var invalidInput = !onValid ? CustomOnInput.ValueTextBox :
+            !offValid || !scheduleValid ? CustomOffInput.ValueTextBox :
+            !durationValid ? FadeDurationInput.ValueTextBox : null;
         if (invalidInput is null)
         {
             return true;
@@ -275,13 +289,13 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void UpdateScheduleValidation()
+    private bool UpdateScheduleValidation()
     {
         var invalid = _showScheduleValidation
                       && CustomModeRadio.IsChecked == true
                       && CustomOnInput.TryGetEditedTime(out var on)
                       && CustomOffInput.TryGetEditedTime(out var off)
-                      && !IsCustomWindowValid(true, on, off);
+                      && !IsCustomWindowValid(on, off);
         var message = invalid
             ? "Set different turn-on and turn-off times. Matching times would never turn Night Ember on."
             : string.Empty;
@@ -292,5 +306,7 @@ public sealed partial class MainWindow : Window
                 .FromElement(ScheduleErrorText)
                 ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
         }
+
+        return !invalid;
     }
 }

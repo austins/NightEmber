@@ -13,9 +13,13 @@ namespace NightEmber.Services;
 internal sealed class WatchdogService : IDisposable
 {
     private const string EventPrefix = @"Local\NightEmber.Watchdog.";
+    private const string WatchdogSwitch = "--watchdog";
+    private const string LauncherSwitch = "--watchdog-launcher";
+    private const int InvalidArgumentsExitCode = 2;
+    private const int LaunchFailedExitCode = 3;
+    private const int LauncherTimeoutMilliseconds = 10_000;
     private readonly EventWaitHandle _orderlyExitEvent;
     private readonly string _eventName;
-    private Process? _watchdogProcess;
     private bool _disposed;
 
     public void Dispose()
@@ -25,7 +29,6 @@ internal sealed class WatchdogService : IDisposable
             return;
         }
 
-        _watchdogProcess?.Dispose();
         _orderlyExitEvent.Dispose();
         _disposed = true;
     }
@@ -44,30 +47,27 @@ internal sealed class WatchdogService : IDisposable
     /// Starts the current executable in internal watchdog mode.
     /// </summary>
     /// <remarks>
-    /// The child receives the main process ID and a randomly named event. It does
-    /// not create a settings window, tray icon, or controller. The shared WPF
-    /// application entry point still initializes application resources before
-    /// dispatching to watchdog mode.
+    /// The watchdog receives the main process ID and a randomly named event. Its entry point
+    /// dispatches to watchdog mode before loading WPF, so it creates no application,
+    /// settings window, tray icon, or controller. It is started through a short-lived launcher
+    /// process so it is not a descendant of the main process; tools that kill a whole process
+    /// tree, such as an IDE's stop command, therefore leave it running to restore the displays.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown when the watchdog could not be started.</exception>
     public void Start()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var executablePath = Environment.ProcessPath
-                             ?? throw new InvalidOperationException("The executable path is unavailable.");
-
-        var startInfo = new ProcessStartInfo(executablePath)
+        using var launcher = StartProcess(LauncherSwitch, Environment.ProcessId, _eventName);
+        if (!launcher.WaitForExit(LauncherTimeoutMilliseconds))
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = AppContext.BaseDirectory
-        };
-        startInfo.ArgumentList.Add("--watchdog");
-        startInfo.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
-        startInfo.ArgumentList.Add(_eventName);
+            throw new InvalidOperationException("The display cleanup watchdog did not start in time.");
+        }
 
-        _watchdogProcess?.Dispose();
-        _watchdogProcess = Process.Start(startInfo)
-                           ?? throw new InvalidOperationException("The display cleanup watchdog did not start.");
+        if (launcher.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"The display cleanup watchdog did not start (exit code {launcher.ExitCode}).");
+        }
     }
 
     /// <summary>
@@ -79,6 +79,26 @@ internal sealed class WatchdogService : IDisposable
         {
             _orderlyExitEvent.Set();
         }
+    }
+
+    /// <summary>
+    /// Determines whether the command line requests internal watchdog mode.
+    /// </summary>
+    /// <param name="arguments">The process command-line arguments.</param>
+    /// <returns><see langword="true" /> when the first argument is the watchdog or launcher switch.</returns>
+    public static bool IsWatchdogCommand(IReadOnlyList<string> arguments)
+    {
+        return arguments.Count > 0 && IsWatchdogSwitch(arguments[0]);
+    }
+
+    /// <summary>
+    /// Runs internal watchdog mode from a command line.
+    /// </summary>
+    /// <param name="arguments">The process command-line arguments.</param>
+    /// <returns>The process exit code.</returns>
+    public static int RunFromCommandLine(IReadOnlyList<string> arguments)
+    {
+        return RunFromCommandLine(arguments, Run, GammaService.ResetAllDisplays, StartWatchdogProcess);
     }
 
     /// <summary>
@@ -96,7 +116,7 @@ internal sealed class WatchdogService : IDisposable
         var parsedProcessId = 0;
 
         var isValid = arguments.Count == 3
-                      && string.Equals(arguments[0], "--watchdog", StringComparison.Ordinal)
+                      && IsWatchdogSwitch(arguments[0])
                       && int.TryParse(
                           arguments[1],
                           NumberStyles.None,
@@ -106,38 +126,14 @@ internal sealed class WatchdogService : IDisposable
                       && arguments[2].StartsWith(EventPrefix, StringComparison.Ordinal)
                       && Guid.TryParseExact(arguments[2][EventPrefix.Length..], "N", out _);
 
-        if (isValid)
+        if (!isValid)
         {
-            processId = parsedProcessId;
-            eventName = arguments[2];
+            return false;
         }
 
-        return isValid;
-    }
-
-    /// <summary>
-    /// Waits for either orderly shutdown or main-process termination.
-    /// </summary>
-    /// <param name="processId">The main process to monitor.</param>
-    /// <param name="eventName">The named event used to signal orderly shutdown.</param>
-    /// <remarks>
-    /// If the process exits before the event is signaled, this method restores
-    /// identity gamma ramps using newly opened display handles.
-    /// </remarks>
-    public static void Run(int processId, string eventName)
-    {
-        using var orderlyExitEvent = EventWaitHandle.OpenExisting(eventName);
-
-        Run(
-            () =>
-            {
-                using var parent = Process.GetProcessById(processId);
-                using ProcessWaitHandle parentExit = new(parent);
-                WaitHandle[] handles = [orderlyExitEvent, parentExit];
-                return WaitHandle.WaitAny(handles);
-            },
-            () => orderlyExitEvent.WaitOne(0),
-            GammaService.ResetAllDisplays);
+        processId = parsedProcessId;
+        eventName = arguments[2];
+        return true;
     }
 
     /// <summary>
@@ -150,24 +146,142 @@ internal sealed class WatchdogService : IDisposable
         return exception is ArgumentException or InvalidOperationException or Win32Exception;
     }
 
-    internal static void Run(Func<int> waitForExit, Func<bool> isOrderlyExit, Action resetDisplays)
+    internal static int RunFromCommandLine(
+        IReadOnlyList<string> arguments,
+        Action<int, string> run,
+        Action resetDisplays,
+        Action<int, string> startWatchdog)
     {
+        if (!TryParseArguments(arguments, out var processId, out var eventName))
+        {
+            // Never continue into a normal launch from a malformed internal command line.
+            return InvalidArgumentsExitCode;
+        }
+
+        if (string.Equals(arguments[0], LauncherSwitch, StringComparison.Ordinal))
+        {
+            // The launcher exits immediately, leaving the watchdog outside the main process tree.
+            try
+            {
+                startWatchdog(processId, eventName);
+                return 0;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                Trace.TraceWarning("Watchdog launcher could not start the watchdog: {0}", ex.Message);
+                return LaunchFailedExitCode;
+            }
+        }
+
         try
         {
-            var signaledHandle = waitForExit();
-            if (signaledHandle == 1 && !isOrderlyExit())
-            {
-                resetDisplays();
-            }
+            run(processId, eventName);
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+            // A normal exit already reset the displays; after a crash this is the
+            // only remaining opportunity to recover a stranded gamma ramp.
+            TryResetDisplays(resetDisplays);
+        }
+
+        return 0;
+    }
+
+    internal static void Run<TState>(
+        TState state,
+        Func<TState, int> waitForExit,
+        Func<TState, bool> isOrderlyExit,
+        Action resetDisplays)
+    {
+        bool shouldReset;
+        try
+        {
+            shouldReset = waitForExit(state) == 1 && !isOrderlyExit(state);
         }
         catch (Exception ex) when (IsProcessMonitoringException(ex))
         {
             // The parent may exit between lookup and handle acquisition. If it did
             // not report an orderly exit, recover the display state immediately.
-            if (!isOrderlyExit())
-            {
-                resetDisplays();
-            }
+            shouldReset = !isOrderlyExit(state);
+        }
+
+        if (!shouldReset)
+        {
+            return;
+        }
+
+        TryResetDisplays(resetDisplays);
+    }
+
+    /// <summary>
+    /// Waits for either orderly shutdown or main-process termination.
+    /// </summary>
+    /// <param name="processId">The main process to monitor.</param>
+    /// <param name="eventName">The named event used to signal orderly shutdown.</param>
+    /// <remarks>
+    /// If the process exits before the event is signaled, this method restores
+    /// identity gamma ramps using newly opened display handles.
+    /// </remarks>
+    private static void Run(int processId, string eventName)
+    {
+        using var orderlyExitEvent = EventWaitHandle.OpenExisting(eventName);
+
+        // The event is passed as state so the callbacks, which run before it is disposed, do not capture it.
+        Run(
+            (OrderlyExitEvent: orderlyExitEvent, ProcessId: processId),
+            static state => WaitForExit(state.OrderlyExitEvent, state.ProcessId),
+            static state => state.OrderlyExitEvent.WaitOne(0),
+            GammaService.ResetAllDisplays);
+    }
+
+    private static int WaitForExit(WaitHandle orderlyExitEvent, int processId)
+    {
+        using var parent = Process.GetProcessById(processId);
+        using ProcessWaitHandle parentExit = new(parent);
+        WaitHandle[] handles = [orderlyExitEvent, parentExit];
+        return WaitHandle.WaitAny(handles);
+    }
+
+    private static bool IsWatchdogSwitch(string argument)
+    {
+        return string.Equals(argument, WatchdogSwitch, StringComparison.Ordinal)
+               || string.Equals(argument, LauncherSwitch, StringComparison.Ordinal);
+    }
+
+    private static void StartWatchdogProcess(int processId, string eventName)
+    {
+        using var watchdog = StartProcess(WatchdogSwitch, processId, eventName);
+    }
+
+    private static Process StartProcess(string mode, int processId, string eventName)
+    {
+        var executablePath = Environment.ProcessPath
+                             ?? throw new InvalidOperationException("The executable path is unavailable.");
+
+        var startInfo = new ProcessStartInfo(executablePath)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = AppContext.BaseDirectory
+        };
+        startInfo.ArgumentList.Add(mode);
+        startInfo.ArgumentList.Add(processId.ToString(CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add(eventName);
+
+        return Process.Start(startInfo)
+               ?? throw new InvalidOperationException("The display cleanup watchdog did not start.");
+    }
+
+    private static void TryResetDisplays(Action resetDisplays)
+    {
+        try
+        {
+            resetDisplays();
+        }
+        catch (Win32Exception ex)
+        {
+            // No display can be enumerated, so there is no remaining ramp to restore.
+            Trace.TraceWarning("Watchdog could not restore neutral gamma: {0}", ex.Message);
         }
     }
 

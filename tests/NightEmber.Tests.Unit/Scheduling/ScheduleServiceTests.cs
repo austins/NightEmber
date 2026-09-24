@@ -8,6 +8,59 @@ public sealed class ScheduleServiceTests
     private static readonly SolarLocation Equator = new(0, 0, "Test");
 
     [Fact]
+    public void ResolveOverride_FirstObservation_PreservesManualOverride()
+    {
+        // Act
+        var result = ScheduleService.ResolveOverride(true, null, false);
+
+        // Assert
+        result.DesiredState.Should().BeTrue();
+        result.ManualOverride.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void ResolveOverride_UnchangedSchedule_PreservesManualOverride(bool manualOverride, bool scheduledState)
+    {
+        // Act
+        var result = ScheduleService.ResolveOverride(manualOverride, scheduledState, scheduledState);
+
+        // Assert
+        result.DesiredState.Should().Be(manualOverride);
+        result.ManualOverride.Should().Be(manualOverride);
+    }
+
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, true, false)]
+    public void ResolveOverride_ScheduleBoundary_ExpiresManualOverride(
+        bool manualOverride,
+        bool previousScheduledState,
+        bool scheduledState)
+    {
+        // Act
+        var result = ScheduleService.ResolveOverride(manualOverride, previousScheduledState, scheduledState);
+
+        // Assert
+        result.DesiredState.Should().Be(scheduledState);
+        result.ManualOverride.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ResolveOverride_NoManualOverride_FollowsSchedule(bool scheduledState)
+    {
+        // Act
+        var result = ScheduleService.ResolveOverride(null, !scheduledState, scheduledState);
+
+        // Assert
+        result.DesiredState.Should().Be(scheduledState);
+        result.ManualOverride.Should().BeNull();
+    }
+
+    [Fact]
     public void ShouldBeOn_ManualMode_IsAlwaysOff()
     {
         // Arrange

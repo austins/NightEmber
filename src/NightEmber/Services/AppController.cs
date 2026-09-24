@@ -3,6 +3,7 @@ using NightEmber.Display;
 using NightEmber.Models;
 using NightEmber.Scheduling;
 using NightEmber.TrayIcon;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -17,7 +18,6 @@ namespace NightEmber.Services;
 internal sealed class AppController : IDisposable
 {
     private const int FadeIntervalMilliseconds = 20;
-    private const double GammaComparisonTolerance = 0.01;
     private const int NeutralBrightnessPercent = 100;
     private const int GammaErrorThrottleMinutes = 1;
     private const int SchedulePollIntervalSeconds = 20;
@@ -41,11 +41,14 @@ internal sealed class AppController : IDisposable
     private bool? _lastScheduledState;
     private bool _previewing;
     private int _exiting;
+    private bool _initialized;
     private bool _disposed;
     private bool _systemEventsSubscribed;
     private bool _neutralRestored;
     private double _currentKelvin = ColorTemperature.NeutralKelvin;
     private double _currentBrightness = NeutralBrightnessPercent;
+    private double _targetKelvin = ColorTemperature.NeutralKelvin;
+    private double _targetBrightness = NeutralBrightnessPercent;
     private int _previewTemperature = ColorTemperature.NeutralKelvin;
     private int _previewBrightness = NeutralBrightnessPercent;
 
@@ -102,8 +105,6 @@ internal sealed class AppController : IDisposable
         _reapplyTimer = _runtime.CreateTimer(
             TimeSpan.FromMilliseconds(DisplayReapplyDelayMilliseconds),
             (_, _) => ReapplyDisplays());
-
-        _reapplyTimer.Stop();
     }
 
     /// <summary>
@@ -122,13 +123,20 @@ internal sealed class AppController : IDisposable
     /// <param name="hidden">
     /// <see langword="true" /> to suppress the first-run settings window; otherwise, <see langword="false" />.
     /// </param>
+    /// <exception cref="InvalidOperationException">Thrown when the controller was already initialized.</exception>
     public void Initialize(bool hidden)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_initialized)
+        {
+            throw new InvalidOperationException("The controller has already been initialized.");
+        }
+
+        _initialized = true;
         var loadResult = _runtime.LoadSettings();
         _settings = loadResult.Settings;
 
-        _tray?.Dispose();
-        _tray = new TrayIconService(Toggle, ShowSettings, Exit);
+        _tray ??= new TrayIconService(Toggle, ShowSettings, Exit);
         SubscribeSystemEvents();
 
         try
@@ -145,7 +153,6 @@ internal sealed class AppController : IDisposable
         TryResetGamma();
         UpdateSchedule(false);
         _scheduleTimer.Start();
-        _driftTimer.Start();
 
         if (loadResult.IsFirstRun)
         {
@@ -196,14 +203,7 @@ internal sealed class AppController : IDisposable
         }
 
         _window = new MainWindow(this);
-        _window.Closed += (_, _) =>
-        {
-            _window = null;
-            if (Debugger.IsAttached)
-            {
-                Exit();
-            }
-        };
+        _window.Closed += (_, _) => _window = null;
         _window.Show();
         _window.Activate();
     }
@@ -238,7 +238,7 @@ internal sealed class AppController : IDisposable
         _previewing = true;
         StopFade();
 
-        if (GammaStatesMatch(_currentKelvin, _currentBrightness, temperature, brightness))
+        if (GammaTransition.StatesMatch(_currentKelvin, _currentBrightness, temperature, brightness))
         {
             return;
         }
@@ -294,82 +294,6 @@ internal sealed class AppController : IDisposable
         }
     }
 
-    /// <summary>
-    /// Resolves the desired tint state, clearing a manual override when the schedule changes state.
-    /// </summary>
-    /// <param name="manualOverride">The user's temporary tint state, or null to follow the schedule.</param>
-    /// <param name="lastScheduledState">The previous scheduled state, or null before the first evaluation.</param>
-    /// <param name="scheduledState">The newly evaluated scheduled state.</param>
-    /// <returns>The desired tint state and the manual override that remains in effect.</returns>
-    public static (bool DesiredState, bool? ManualOverride) ResolveScheduleState(
-        bool? manualOverride,
-        bool? lastScheduledState,
-        bool scheduledState)
-    {
-        if (manualOverride is not null && lastScheduledState is not null && scheduledState != lastScheduledState)
-        {
-            manualOverride = null;
-        }
-
-        return (manualOverride ?? scheduledState, manualOverride);
-    }
-
-    /// <summary>
-    /// Calculates clamped fade progress from monotonic elapsed time.
-    /// </summary>
-    /// <param name="elapsed">The elapsed fade time.</param>
-    /// <param name="duration">The configured fade duration.</param>
-    /// <returns>A progress value from zero through one.</returns>
-    public static double CalculateFadeProgress(TimeSpan elapsed, TimeSpan duration)
-    {
-        if (duration <= TimeSpan.Zero)
-        {
-            return 1;
-        }
-
-        return Math.Clamp(elapsed / duration, 0, 1);
-    }
-
-    /// <summary>
-    /// Linearly interpolates temperature and brightness for a fade.
-    /// </summary>
-    /// <param name="startKelvin">The starting color temperature in Kelvin.</param>
-    /// <param name="startBrightness">The starting brightness percentage.</param>
-    /// <param name="targetKelvin">The target color temperature in Kelvin.</param>
-    /// <param name="targetBrightness">The target brightness percentage.</param>
-    /// <param name="progress">The fade progress, clamped to the range from zero through one.</param>
-    /// <returns>The interpolated color temperature and brightness percentage.</returns>
-    public static (double Kelvin, double Brightness) InterpolateGammaState(
-        double startKelvin,
-        double startBrightness,
-        double targetKelvin,
-        double targetBrightness,
-        double progress)
-    {
-        progress = Math.Clamp(progress, 0, 1);
-
-        return (startKelvin + (targetKelvin - startKelvin) * progress,
-            startBrightness + (targetBrightness - startBrightness) * progress);
-    }
-
-    /// <summary>
-    /// Determines whether two gamma states are equivalent within the application tolerance.
-    /// </summary>
-    /// <param name="firstKelvin">The first color temperature in Kelvin.</param>
-    /// <param name="firstBrightness">The first brightness percentage.</param>
-    /// <param name="secondKelvin">The second color temperature in Kelvin.</param>
-    /// <param name="secondBrightness">The second brightness percentage.</param>
-    /// <returns><see langword="true" /> when both values are within tolerance; otherwise, <see langword="false" />.</returns>
-    public static bool GammaStatesMatch(
-        double firstKelvin,
-        double firstBrightness,
-        double secondKelvin,
-        double secondBrightness)
-    {
-        return Math.Abs(firstKelvin - secondKelvin) < GammaComparisonTolerance
-               && Math.Abs(firstBrightness - secondBrightness) < GammaComparisonTolerance;
-    }
-
     internal void Exit()
     {
         if (IsExiting)
@@ -403,7 +327,7 @@ internal sealed class AppController : IDisposable
         }
 
         var scheduled = ScheduleService.ShouldBeOn(_settings, _runtime.Now);
-        var resolution = ResolveScheduleState(_manualOverride, _lastScheduledState, scheduled);
+        var resolution = ScheduleService.ResolveOverride(_manualOverride, _lastScheduledState, scheduled);
         _manualOverride = resolution.ManualOverride;
         _lastScheduledState = scheduled;
         if (force || resolution.DesiredState != _isOn)
@@ -432,6 +356,26 @@ internal sealed class AppController : IDisposable
         }
     }
 
+    internal void OnTimeChanged(object? sender, EventArgs e)
+    {
+        if (IsExiting)
+        {
+            return;
+        }
+
+        _runtime.Post(() =>
+        {
+            if (IsExiting)
+            {
+                return;
+            }
+
+            // Time-zone changes also raise this event, and .NET caches the local zone until cleared.
+            _runtime.RefreshTimeZone();
+            UpdateSchedule(false);
+        });
+    }
+
     internal void OnSessionEnding(object sender, SessionEndingEventArgs e)
     {
         if (_runtime.CheckAccess())
@@ -447,8 +391,17 @@ internal sealed class AppController : IDisposable
         catch (Exception ex) when (ex is OperationCanceledException or InvalidOperationException)
         {
             // The dispatcher is already shutting down, so restore the displays directly.
-            _gammaService.ResetAll();
+            TryResetAllDisplays();
         }
+    }
+
+    private void ResetForSessionEnding()
+    {
+        // WPF shuts the application down after SessionEnding unless cancelled, so the
+        // displays are restored now while the dispatcher can still run this work.
+        Volatile.Write(ref _exiting, 1);
+        StopTimers();
+        TryResetGamma();
     }
 
     private void SetTintState(bool isOn, bool fade)
@@ -459,11 +412,14 @@ internal sealed class AppController : IDisposable
 
         var targetKelvin = isOn ? _settings.Temperature : ColorTemperature.NeutralKelvin;
         var targetBrightness = isOn ? (double)_settings.Brightness : NeutralBrightnessPercent;
+        _targetKelvin = targetKelvin;
+        _targetBrightness = targetBrightness;
         if (!fade
             || _settings.FadeMs <= 0
-            || GammaStatesMatch(_currentKelvin, _currentBrightness, targetKelvin, targetBrightness))
+            || GammaTransition.StatesMatch(_currentKelvin, _currentBrightness, targetKelvin, targetBrightness))
         {
             ApplyGamma(targetKelvin, targetBrightness);
+            UpdateDriftMonitoring();
             return;
         }
 
@@ -476,15 +432,16 @@ internal sealed class AppController : IDisposable
             TimeSpan.FromMilliseconds(FadeIntervalMilliseconds),
             (_, _) =>
             {
-                var progress = CalculateFadeProgress(_runtime.GetElapsedTime(fadeStartedAt), fadeDuration);
+                var progress = GammaTransition.CalculateProgress(_runtime.GetElapsedTime(fadeStartedAt), fadeDuration);
                 if (progress >= 1)
                 {
                     ApplyGamma(targetKelvin, targetBrightness);
                     StopFade();
+                    UpdateDriftMonitoring();
                     return;
                 }
 
-                var state = InterpolateGammaState(
+                var state = GammaTransition.Interpolate(
                     startKelvin,
                     startBrightness,
                     targetKelvin,
@@ -494,6 +451,7 @@ internal sealed class AppController : IDisposable
                 ApplyGamma(state.Kelvin, state.Brightness);
             });
         _fadeTimer.Start();
+        UpdateDriftMonitoring();
     }
 
     private void ApplyGamma(double kelvin, double brightness)
@@ -503,6 +461,11 @@ internal sealed class AppController : IDisposable
             if (!_gammaService.Apply(kelvin, brightness))
             {
                 ReportGammaError("The display driver rejected the requested gamma ramp.");
+
+                // Each rejected write already reopened every display; the drift timer retries later
+                // instead of repeating that work on every fade tick.
+                StopFade();
+                UpdateDriftMonitoring();
                 return;
             }
 
@@ -514,13 +477,28 @@ internal sealed class AppController : IDisposable
         {
             ReportGammaError(ex.Message);
             StopFade();
+            UpdateDriftMonitoring();
         }
     }
 
     private void RepairGammaDrift()
     {
-        if (!_isOn || _previewing || _fadeTimer is not null || IsExiting)
+        if (_previewing || _fadeTimer is not null || IsExiting)
         {
+            return;
+        }
+
+        if (!GammaTransition.StatesMatch(_currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness))
+        {
+            // A previous write was rejected before the tint reached its target, including a fade to neutral.
+            ApplyGamma(_targetKelvin, _targetBrightness);
+            UpdateDriftMonitoring();
+            return;
+        }
+
+        if (!_isOn)
+        {
+            _driftTimer.Stop();
             return;
         }
 
@@ -531,6 +509,22 @@ internal sealed class AppController : IDisposable
         catch (Exception ex) when (IsDisplayException(ex))
         {
             ReportGammaError(ex.Message);
+        }
+    }
+
+    private void UpdateDriftMonitoring()
+    {
+        // Neutral output only needs monitoring while a rejected write still has to be retried.
+        if (!IsExiting
+            && (_isOn
+                || (_fadeTimer is null
+                    && !GammaTransition.StatesMatch(_currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness))))
+        {
+            _driftTimer.Start();
+        }
+        else
+        {
+            _driftTimer.Stop();
         }
     }
 
@@ -564,19 +558,23 @@ internal sealed class AppController : IDisposable
         try
         {
             _gammaService.OpenDisplays();
-
-            if (_previewing)
-            {
-                ApplyGamma(_previewTemperature, _previewBrightness);
-            }
-            else
-            {
-                UpdateSchedule(true);
-            }
+            RestoreActiveState();
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
             ReportGammaError(ex.Message);
+        }
+    }
+
+    private void RestoreActiveState()
+    {
+        if (_previewing)
+        {
+            ApplyGamma(_previewTemperature, _previewBrightness);
+        }
+        else
+        {
+            UpdateSchedule(true);
         }
     }
 
@@ -587,34 +585,13 @@ internal sealed class AppController : IDisposable
             return;
         }
 
-        var state = _isOn ? $"Night Ember on - {_settings.Temperature}K" : "Night Ember off";
-        var next = ScheduleService.GetNextChange(_settings, _runtime.Now);
-
-        var time = next?.ToString(
-                       CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern,
-                       CultureInfo.CurrentCulture)
-                   ?? string.Empty;
-
-        var verb = _isOn ? "off" : "on";
-
-        string reason;
-        if (_manualOverride is not null)
-        {
-            reason = next is null ? "Manual" : $"Manual until {time}";
-        }
-        else
-        {
-            reason = _settings.Mode switch
-            {
-                ScheduleMode.Sunset when next is not null => $"Sun schedule: {verb} {time}",
-                ScheduleMode.Sunset => "Sunset to sunrise",
-                ScheduleMode.Custom when next is not null => $"Set hours: {verb} {time}",
-                ScheduleMode.Custom => "Set hours",
-                _ => "Manual only"
-            };
-        }
-
-        var tooltip = $"{state}\n{reason}";
+        var tooltip = TrayTooltip.Format(
+            _isOn,
+            _settings.Temperature,
+            _manualOverride is not null,
+            _settings.Mode,
+            ScheduleService.GetNextChange(_settings, _runtime.Now),
+            CultureInfo.CurrentCulture);
         _tray.Update(_isOn, tooltip);
     }
 
@@ -648,27 +625,48 @@ internal sealed class AppController : IDisposable
         {
             if (!_gammaService.Reset())
             {
-                _gammaService.ResetAll();
+                TryResetAllDisplays();
             }
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
-            _gammaService.ResetAll();
+            TryResetAllDisplays();
         }
         finally
         {
             // Repeated ramp writes make some drivers re-composite the desktop,
             // so shutdown paths skip a reset that already happened.
             _neutralRestored = true;
+            _currentKelvin = ColorTemperature.NeutralKelvin;
+            _currentBrightness = NeutralBrightnessPercent;
+        }
+    }
+
+    private void TryResetAllDisplays()
+    {
+        try
+        {
+            _gammaService.ResetAll();
+        }
+        catch (Exception ex) when (IsDisplayException(ex))
+        {
+            // No display can be enumerated, so there is no remaining ramp to restore.
+            Trace.TraceWarning("Could not restore neutral gamma: {0}", ex.Message);
         }
     }
 
     private void SubscribeSystemEvents()
     {
+        if (_systemEventsSubscribed)
+        {
+            return;
+        }
+
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.SessionEnding += OnSessionEnding;
+        SystemEvents.TimeChanged += OnTimeChanged;
         _systemEventsSubscribed = true;
     }
 
@@ -683,6 +681,7 @@ internal sealed class AppController : IDisposable
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.SessionEnding -= OnSessionEnding;
+        SystemEvents.TimeChanged -= OnTimeChanged;
         _systemEventsSubscribed = false;
     }
 
@@ -691,18 +690,9 @@ internal sealed class AppController : IDisposable
         ScheduleDisplayReapply();
     }
 
-    private void ResetForSessionEnding()
-    {
-        Volatile.Write(ref _exiting, 1);
-        StopTimers();
-        TryResetGamma();
-    }
-
     private static bool IsDisplayException(Exception exception)
     {
-        return exception is InvalidOperationException
-            or System.ComponentModel.Win32Exception
-            or ObjectDisposedException;
+        return exception is Win32Exception;
     }
 
     private bool IsExiting => Volatile.Read(ref _exiting) != 0;

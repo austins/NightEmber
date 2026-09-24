@@ -34,15 +34,50 @@ public sealed class GammaRampBuilderTests
     }
 
     [Fact]
-    public void Build_DriverFloorEnabled_ClampsCombinedMultiplierToOneHalf()
+    public void Build_DriverFloorEnabled_KeepsEveryChannelAtOrAboveOneHalf()
     {
         // Act
         var ramp = GammaRampBuilder.Build(0, 0.25, 0.5, 0.5, true);
 
         // Assert
-        ramp[255].Should().Be(32767);
-        ramp[GammaRampBuilder.RampLength + 255].Should().Be(32767);
-        ramp[2 * GammaRampBuilder.RampLength + 255].Should().Be(32767);
+        ramp[255].Should().Be(32768);
+        ramp[GammaRampBuilder.RampLength + 255].Should().Be(32768);
+        ramp[2 * GammaRampBuilder.RampLength + 255].Should().Be(32768);
+    }
+
+    [Fact]
+    public void Build_DriverFloorEnabled_DimsOnlyHeadroomAboveFloor()
+    {
+        // Act
+        var ramp = GammaRampBuilder.Build(1, 0.75, 0.6, 0.75, true);
+
+        // Assert
+        ramp[255].Should().Be(49151);
+        ramp[GammaRampBuilder.RampLength + 255].Should().Be(40959);
+        ramp[2 * GammaRampBuilder.RampLength + 255].Should().Be(36044);
+    }
+
+    [Fact]
+    public void Build_DriverFloorEnabled_DistinctWarmChannelsStayDistinctWhenDimmed()
+    {
+        // Act
+        var ramp = GammaRampBuilder.Build(1, 0.75, 0.55, 0.8, true);
+
+        // Assert
+        ramp[255].Should().BeGreaterThan(ramp[GammaRampBuilder.RampLength + 255]);
+        ramp[GammaRampBuilder.RampLength + 255].Should().BeGreaterThan(ramp[2 * GammaRampBuilder.RampLength + 255]);
+    }
+
+    [Fact]
+    public void Build_DriverFloorEnabledAndBrightnessBelowFloor_ClampsBrightnessToFloor()
+    {
+        // Act
+        var ramp = GammaRampBuilder.Build(1, 1, 1, 0.2, true);
+
+        // Assert
+        ramp[255].Should().Be(32768);
+        ramp[GammaRampBuilder.RampLength + 255].Should().Be(32768);
+        ramp[2 * GammaRampBuilder.RampLength + 255].Should().Be(32768);
     }
 
     [Fact]
@@ -53,8 +88,8 @@ public sealed class GammaRampBuilderTests
 
         // Assert
         ramp[255].Should().Be(0);
-        ramp[GammaRampBuilder.RampLength + 255].Should().Be(8191);
-        ramp[2 * GammaRampBuilder.RampLength + 255].Should().Be(16383);
+        ramp[GammaRampBuilder.RampLength + 255].Should().Be(8192);
+        ramp[2 * GammaRampBuilder.RampLength + 255].Should().Be(16384);
     }
 
     [Fact]

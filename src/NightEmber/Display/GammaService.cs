@@ -78,7 +78,7 @@ internal sealed class GammaService : IGammaService
         EnsureDisplays();
 
         var rgb = ColorTemperature.ToRgb(kelvin);
-        var brightness = Math.Clamp(brightnessPercent / PercentageScale, GammaRampBuilder.DriverMinimumMultiplier, 1.0);
+        var brightness = brightnessPercent / PercentageScale;
         GammaRampBuilder.BuildInto(_rampBuffer, rgb.Red, rgb.Green, rgb.Blue, brightness, true);
 
         if (ApplyToAll(_rampBuffer))

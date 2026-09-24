@@ -7,7 +7,7 @@ namespace NightEmber.Controls;
 /// <summary>
 /// Provides an integer input that supports direct text entry and incremental adjustment.
 /// </summary>
-public sealed partial class NumericUpDown : System.Windows.Controls.UserControl
+public sealed partial class NumericUpDown
 {
     /// <summary>
     /// Identifies the <see cref="Minimum" /> dependency property.

@@ -60,7 +60,7 @@ public sealed class AppControllerTests
 
         // Assert
         fade.IsRunning.Should().BeFalse();
-        fixture.Gamma.Applied.Should().Equal((5000d, 87.5d), (4200d, 90d), (3400d, 75d));
+        fixture.Gamma.Applied.Should().Equal((4950d, 87.5d), (4200d, 90d), (3400d, 75d));
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class AppControllerTests
         fixture.Controller.UpdateSchedule(false);
 
         // Assert
-        fixture.Gamma.Applied.Should().Equal((3400d, 75d), (4200d, 90d), (6600d, 100d));
+        fixture.Gamma.Applied.Should().Equal((3400d, 75d), (4200d, 90d), (6500d, 100d));
     }
 
     [Fact]
@@ -103,9 +103,9 @@ public sealed class AppControllerTests
 
         // Assert
         firstFade.IsRunning.Should().BeFalse();
-        intermediateStates.Should().Equal((5000d, 87.5d), (5800d, 93.75d));
+        intermediateStates.Should().Equal((4950d, 87.5d), (5725d, 93.75d));
         reverseFade.IsRunning.Should().BeFalse();
-        fixture.Gamma.Applied[^1].Should().Be((6600d, 100d));
+        fixture.Gamma.Applied[^1].Should().Be((6500d, 100d));
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public sealed class AppControllerTests
         fixture.Controller.UpdateSchedule(false);
 
         // Assert
-        fixture.Gamma.Applied.Should().Equal((3400d, 75d), (6600d, 100d));
+        fixture.Gamma.Applied.Should().Equal((3400d, 75d), (6500d, 100d));
     }
 
     [Fact]
@@ -408,7 +408,7 @@ public sealed class AppControllerTests
 
         var timerRunningAfterFailure = fade.IsRunning;
         fixture.Gamma.ApplyException = null;
-        fixture.Controller.Preview(6600, 100);
+        fixture.Controller.Preview(6500, 100);
 
         // Assert
         timerRunningAfterFailure.Should().BeFalse();
@@ -519,114 +519,167 @@ public sealed class AppControllerTests
     }
 
     [Fact]
-    public void ResolveScheduleState_FirstObservation_PreservesManualOverride()
+    public void OnSessionEnding_StopsTimersAndIgnoresLaterBackgroundWork()
     {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Controller.UpdateSchedule(true);
+        var drift = fixture.Runtime.Timers[1];
+        fixture.Controller.OnSessionEnding(fixture, new SessionEndingEventArgs(SessionEndReasons.Logoff));
+        var timersRunning = fixture.Runtime.Timers.Select(static timer => timer.IsRunning).ToArray();
+        fixture.Events.Clear();
+
         // Act
-        var result = AppController.ResolveScheduleState(true, null, false);
+        fixture.Controller.UpdateSchedule(true);
+        fixture.Controller.Toggle();
+        fixture.Controller.OnPowerModeChanged(fixture, new PowerModeChangedEventArgs(PowerModes.Resume));
+        fixture.Controller.OnTimeChanged(fixture, EventArgs.Empty);
+        fixture.Runtime.DrainPosted();
+        drift.Start();
+        drift.Fire();
 
         // Assert
-        result.DesiredState.Should().BeTrue();
-        result.ManualOverride.Should().BeTrue();
+        timersRunning.Should().AllSatisfy(static running => running.Should().BeFalse());
+        fixture.Events.Should().BeEmpty();
+        fixture.Gamma.Applied.Should().Equal((3400d, 75d));
     }
 
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    public void ResolveScheduleState_UnchangedSchedule_PreservesManualOverride(bool manualOverride, bool scheduledState)
+    [Fact]
+    public void Exit_FallbackResetThrowsDisplayException_StillShutsDown()
     {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Gamma.ResetResult = false;
+        fixture.Gamma.ResetAllException = new System.ComponentModel.Win32Exception("no displays");
+
         // Act
-        var result = AppController.ResolveScheduleState(manualOverride, scheduledState, scheduledState);
+        fixture.Controller.Exit();
 
         // Assert
-        result.DesiredState.Should().Be(manualOverride);
-        result.ManualOverride.Should().Be(manualOverride);
+        fixture.Events.Should().Equal("reset", "reset-all", "shutdown");
     }
 
-    [Theory]
-    [InlineData(false, false, true)]
-    [InlineData(true, true, false)]
-    public void ResolveScheduleState_ScheduleBoundary_ExpiresManualOverride(
-        bool manualOverride,
-        bool previousScheduledState,
-        bool scheduledState)
+    [Fact]
+    public void OnSessionEnding_UnavailableDispatcherAndResetAllThrows_DoesNotPropagate()
     {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Runtime.HasAccess = false;
+        fixture.Runtime.InvokeException = new InvalidOperationException("dispatcher stopped");
+        fixture.Gamma.ResetAllException = new System.ComponentModel.Win32Exception("no displays");
+
         // Act
-        var result = AppController.ResolveScheduleState(manualOverride, previousScheduledState, scheduledState);
+        var sessionEnding = () => fixture.Controller.OnSessionEnding(
+            fixture,
+            new SessionEndingEventArgs(SessionEndReasons.Logoff));
 
         // Assert
-        result.DesiredState.Should().Be(scheduledState);
-        result.ManualOverride.Should().BeNull();
+        sessionEnding.Should().NotThrow();
+        fixture.Events.Should().Equal("invoke", "reset-all");
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ResolveScheduleState_NoManualOverride_FollowsSchedule(bool scheduledState)
+    [Fact]
+    public void OnTimeChanged_RefreshesTimeZoneBeforeReevaluatingSchedule()
     {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Runtime.Now = new DateTime(2026, 9, 4, 12, 0, 0, DateTimeKind.Local);
+        fixture.Controller.UpdateSchedule(true);
+        fixture.Events.Clear();
+        fixture.Runtime.Now = new DateTime(2026, 9, 4, 22, 0, 0, DateTimeKind.Local);
+
         // Act
-        var result = AppController.ResolveScheduleState(null, !scheduledState, scheduledState);
+        fixture.Controller.OnTimeChanged(fixture, EventArgs.Empty);
+        var eventsBeforeDispatch = fixture.Events.ToArray();
+        fixture.Runtime.DrainPosted();
 
         // Assert
-        result.DesiredState.Should().Be(scheduledState);
-        result.ManualOverride.Should().BeNull();
+        eventsBeforeDispatch.Should().BeEmpty();
+        fixture.Events.Should().Equal("refresh-tz", "apply");
+        fixture.Gamma.Applied[^1].Should().Be((3400d, 75d));
     }
 
-    [Theory]
-    [InlineData(-100, 400, 0)]
-    [InlineData(0, 400, 0)]
-    [InlineData(100, 400, 0.25)]
-    [InlineData(400, 400, 1)]
-    [InlineData(500, 400, 1)]
-    [InlineData(0, 0, 1)]
-    public void CalculateFadeProgress_ElapsedTime_ReturnsClampedProgress(
-        int elapsedMilliseconds,
-        int durationMilliseconds,
-        double expected)
+    [Fact]
+    public void RepairGammaDrift_PreviousWriteRejected_RetriesTargetInsteadOfRepairing()
     {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Gamma.ApplyResults.Enqueue(false);
+        fixture.Controller.UpdateSchedule(true);
+        var drift = fixture.Runtime.Timers[1];
+        fixture.Events.Clear();
+
         // Act
-        var result = AppController.CalculateFadeProgress(
-            TimeSpan.FromMilliseconds(elapsedMilliseconds),
-            TimeSpan.FromMilliseconds(durationMilliseconds));
+        drift.Fire();
+        drift.Fire();
 
         // Assert
-        result.Should().Be(expected);
+        fixture.Events.Should().Equal("apply", "repair");
+        fixture.Gamma.Applied.Should().Equal((3400d, 75d), (3400d, 75d));
     }
 
-    [Theory]
-    [InlineData(0.25, 5800, 95)]
-    [InlineData(0.5, 5000, 90)]
-    [InlineData(1, 3400, 80)]
-    [InlineData(1.25, 3400, 80)]
-    public void InterpolateGammaState_FadeProgress_InterpolatesAndClampsAtTarget(
-        double progress,
-        double expectedKelvin,
-        double expectedBrightness)
+    [Fact]
+    public void DriftMonitoring_RunsOnlyWhileTintIsOn()
     {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        var drift = fixture.Runtime.Timers[1];
+        var runningInitially = drift.IsRunning;
+
         // Act
-        var result = AppController.InterpolateGammaState(6600, 100, 3400, 80, progress);
+        fixture.Controller.UpdateSchedule(true);
+        var runningWhileOn = drift.IsRunning;
+        fixture.Controller.Toggle();
 
         // Assert
-        result.Kelvin.Should().Be(expectedKelvin);
-        result.Brightness.Should().Be(expectedBrightness);
+        runningInitially.Should().BeFalse();
+        runningWhileOn.Should().BeTrue();
+        drift.IsRunning.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(3400, 80, 3400, 80, true)]
-    [InlineData(3400, 80, 3400.009, 80.009, true)]
-    [InlineData(3400, 80, 3400.01, 80, false)]
-    [InlineData(3400, 80, 3400, 80.01, false)]
-    public void GammaStatesMatch_States_UsesExclusiveTolerance(
-        double firstKelvin,
-        double firstBrightness,
-        double secondKelvin,
-        double secondBrightness,
-        bool expected)
+    [Fact]
+    public void ApplyGamma_RejectedDuringFade_StopsFade()
     {
+        // Arrange
+        using var fixture = new ControllerFixture(1000);
+        fixture.Controller.UpdateSchedule(false);
+        var fade = fixture.Runtime.Timers[^1];
+        fixture.Gamma.ApplyResults.Enqueue(false);
+        fixture.Runtime.Elapsed = TimeSpan.FromMilliseconds(500);
+
         // Act
-        var result = AppController.GammaStatesMatch(firstKelvin, firstBrightness, secondKelvin, secondBrightness);
+        fade.Fire();
 
         // Assert
-        result.Should().Be(expected);
+        fade.IsRunning.Should().BeFalse();
+        fixture.Gamma.Applied.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void RepairGammaDrift_FadeOffRejected_RetriesNeutralThenStopsMonitoring()
+    {
+        // Arrange
+        using var fixture = new ControllerFixture(1000);
+        fixture.Controller.UpdateSchedule(true);
+        var drift = fixture.Runtime.Timers[1];
+        fixture.Controller.Toggle();
+        var fade = fixture.Runtime.Timers[^1];
+        var runningDuringFade = drift.IsRunning;
+        fixture.Gamma.ApplyResults.Enqueue(false);
+        fixture.Runtime.Elapsed = TimeSpan.FromMilliseconds(500);
+        fade.Fire();
+        var runningAfterRejection = drift.IsRunning;
+        fixture.Events.Clear();
+
+        // Act
+        drift.Fire();
+
+        // Assert
+        runningDuringFade.Should().BeFalse();
+        runningAfterRejection.Should().BeTrue();
+        fixture.Events.Should().Equal("apply");
+        fixture.Gamma.Applied[^1].Should().Be((6500d, 100d));
+        drift.IsRunning.Should().BeFalse();
     }
 
     internal sealed class ControllerFixture : IDisposable
@@ -679,6 +732,8 @@ public sealed class AppControllerTests
 
         public Exception? RepairException { get; set; }
 
+        public Exception? ResetAllException { get; set; }
+
         public bool ResetResult { get; set; } = true;
 
         public void OpenDisplays()
@@ -725,6 +780,10 @@ public sealed class AppControllerTests
         public void ResetAll()
         {
             events.Add("reset-all");
+            if (ResetAllException is not null)
+            {
+                throw ResetAllException;
+            }
         }
 
         public void Dispose()
@@ -830,6 +889,11 @@ public sealed class AppControllerTests
             {
                 action();
             }
+        }
+
+        public void RefreshTimeZone()
+        {
+            events.Add("refresh-tz");
         }
     }
 

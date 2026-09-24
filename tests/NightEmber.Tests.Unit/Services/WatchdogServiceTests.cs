@@ -21,8 +21,9 @@ public sealed class WatchdogServiceTests
 
         // Act
         WatchdogService.Run(
-            () => signaledHandle,
-            () =>
+            0,
+            _ => signaledHandle,
+            _ =>
             {
                 checks++;
                 return orderly;
@@ -52,7 +53,7 @@ public sealed class WatchdogServiceTests
         foreach (var failure in failures)
         {
             var resets = 0;
-            WatchdogService.Run(() => throw failure, () => orderly, () => resets++);
+            WatchdogService.Run(0, _ => throw failure, _ => orderly, () => resets++);
             resetCounts.Add(resets);
         }
 
@@ -69,12 +70,13 @@ public sealed class WatchdogServiceTests
 
         // Act
         WatchdogService.Run(
-            () =>
+            0,
+            _ =>
             {
                 orderly = true;
                 return 1;
             },
-            () => orderly,
+            _ => orderly,
             () => resets++);
 
         // Assert
@@ -90,8 +92,9 @@ public sealed class WatchdogServiceTests
 
         // Act
         var run = () => WatchdogService.Run(
-            () => throw new IOException("unrelated"),
-            () =>
+            0,
+            _ => throw new IOException("unrelated"),
+            _ =>
             {
                 checks++;
                 return false;
@@ -111,18 +114,125 @@ public sealed class WatchdogServiceTests
         var failure = new IOException("recovery failed");
 
         // Act
-        var run = () => WatchdogService.Run(() => 1, () => false, () => throw failure);
+        var run = () => WatchdogService.Run(0, _ => 1, _ => false, () => throw failure);
 
         // Assert
         run.Should().Throw<IOException>().WithMessage("recovery failed");
     }
 
     [Fact]
-    public void TryParseArguments_ValidArguments_ReturnsParsedValues()
+    public void Run_UnexpectedExitAndNoDisplays_AttemptsRecoveryOnceWithoutThrowing()
+    {
+        // Arrange
+        var resets = 0;
+
+        // Act
+        var run = () => WatchdogService.Run(
+            0,
+            _ => 1,
+            _ => false,
+            () =>
+            {
+                resets++;
+                throw new System.ComponentModel.Win32Exception("no displays");
+            });
+
+        // Assert
+        run.Should().NotThrow();
+        resets.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(new[] { "--watchdog" }, true)]
+    [InlineData(new[] { "--watchdog", "1", "x" }, true)]
+    [InlineData(new[] { "--watchdog-launcher", "1", "x" }, true)]
+    [InlineData(new[] { "--WATCHDOG" }, false)]
+    [InlineData(new[] { "--hidden" }, false)]
+    [InlineData(new string[0], false)]
+    public void IsWatchdogCommand_Arguments_MatchesOnlyExactFirstSwitch(string[] arguments, bool expected)
+    {
+        // Act
+        var result = WatchdogService.IsWatchdogCommand(arguments);
+
+        // Assert
+        result.Should().Be(expected);
+    }
+
+    [Fact]
+    public void RunFromCommandLine_MalformedArguments_ReturnsErrorWithoutMonitoring()
+    {
+        // Arrange
+        var runs = 0;
+        var resets = 0;
+
+        // Act
+        var exitCode = WatchdogService.RunFromCommandLine(
+            ["--watchdog", "not-a-pid"],
+            (_, _) => runs++,
+            () => resets++,
+            (_, _) => runs++);
+
+        // Assert
+        exitCode.Should().NotBe(0);
+        runs.Should().Be(0);
+        resets.Should().Be(0);
+    }
+
+    [Fact]
+    public void RunFromCommandLine_ValidArguments_MonitorsParsedProcess()
     {
         // Arrange
         const string eventName = @"Local\NightEmber.Watchdog.0123456789abcdef0123456789abcdef";
-        string[] arguments = ["--watchdog", "42", eventName];
+        (int ProcessId, string EventName)? monitored = null;
+
+        // Act
+        var exitCode = WatchdogService.RunFromCommandLine(
+            ["--watchdog", "42", eventName],
+            (processId, name) => monitored = (processId, name),
+            static () => throw new InvalidOperationException("unexpected reset"),
+            static (_, _) => throw new InvalidOperationException("unexpected launch"));
+
+        // Assert
+        exitCode.Should().Be(0);
+        monitored.Should().Be((42, eventName));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RunFromCommandLine_OrderlyExitEventMissing_ResetsWithoutThrowing(bool resetFails)
+    {
+        // Arrange
+        const string eventName = @"Local\NightEmber.Watchdog.0123456789abcdef0123456789abcdef";
+        var resets = 0;
+
+        // Act
+        var exitCode = WatchdogService.RunFromCommandLine(
+            ["--watchdog", "42", eventName],
+            static (_, _) => throw new WaitHandleCannotBeOpenedException(),
+            () =>
+            {
+                resets++;
+                if (resetFails)
+                {
+                    throw new System.ComponentModel.Win32Exception("no displays");
+                }
+            },
+            static (_, _) => throw new InvalidOperationException("unexpected launch"));
+
+        // Assert
+        exitCode.Should().Be(0);
+        resets.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("--watchdog")]
+    [InlineData("--watchdog-launcher")]
+    public void TryParseArguments_ValidArguments_ReturnsParsedValues(string mode)
+    {
+        // Arrange
+        const string eventName = @"Local\NightEmber.Watchdog.0123456789abcdef0123456789abcdef";
+        string[] arguments = [mode, "42", eventName];
 
         // Act
         var result = WatchdogService.TryParseArguments(arguments, out var processId, out var parsedEventName);
@@ -131,6 +241,51 @@ public sealed class WatchdogServiceTests
         result.Should().BeTrue();
         processId.Should().Be(42);
         parsedEventName.Should().Be(eventName);
+    }
+
+    [Fact]
+    public void RunFromCommandLine_Launcher_StartsWatchdogAndExitsWithoutMonitoring()
+    {
+        // Arrange
+        const string eventName = @"Local\NightEmber.Watchdog.0123456789abcdef0123456789abcdef";
+        (int ProcessId, string EventName)? launched = null;
+        var runs = 0;
+
+        // Act
+        var exitCode = WatchdogService.RunFromCommandLine(
+            ["--watchdog-launcher", "42", eventName],
+            (_, _) => runs++,
+            static () => throw new InvalidOperationException("unexpected reset"),
+            (processId, name) => launched = (processId, name));
+
+        // Assert
+        exitCode.Should().Be(0);
+        runs.Should().Be(0);
+        launched.Should().Be((42, eventName));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RunFromCommandLine_LauncherCannotStartWatchdog_ReturnsFailureWithoutReset(bool win32Failure)
+    {
+        // Arrange
+        const string eventName = @"Local\NightEmber.Watchdog.0123456789abcdef0123456789abcdef";
+        Exception failure = win32Failure
+            ? new System.ComponentModel.Win32Exception("access denied")
+            : new InvalidOperationException("no path");
+        var resets = 0;
+
+        // Act
+        var exitCode = WatchdogService.RunFromCommandLine(
+            ["--watchdog-launcher", "42", eventName],
+            static (_, _) => throw new InvalidOperationException("unexpected run"),
+            () => resets++,
+            (_, _) => throw failure);
+
+        // Assert
+        exitCode.Should().NotBe(0);
+        resets.Should().Be(0);
     }
 
     [Fact]
@@ -145,6 +300,7 @@ public sealed class WatchdogServiceTests
             ["--watchdog", "42"],
             ["--watchdog", "42", validEvent, "extra"],
             ["--WATCHDOG", "42", validEvent],
+            ["--watchdog-launcher", "42"],
             ["watchdog", "42", validEvent],
             ["--watchdog", "0", validEvent],
             ["--watchdog", "-1", validEvent],

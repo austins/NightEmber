@@ -44,6 +44,20 @@ internal static class WpfTestHelper
     }
 
     /// <summary>
+    /// Processes dispatcher work queued at background priority or higher on the current STA thread.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="RunAsync" /> does not run a message loop, so tests call this to deliver coalesced
+    /// dispatcher operations deterministically.
+    /// </remarks>
+    public static void FlushDispatcher()
+    {
+#pragma warning disable VSTHRD001 // Tests intentionally pump the STA dispatcher synchronously.
+        Dispatcher.CurrentDispatcher.Invoke(static () => { }, DispatcherPriority.Background);
+#pragma warning restore VSTHRD001
+    }
+
+    /// <summary>
     /// Raises a synthetic preview key-down event directly on a WPF element.
     /// </summary>
     /// <param name="element">The element whose routed input handlers should receive the event.</param>

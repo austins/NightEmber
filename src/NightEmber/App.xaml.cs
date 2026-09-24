@@ -1,4 +1,3 @@
-using NightEmber.Display;
 using NightEmber.Services;
 using System.Windows;
 
@@ -7,7 +6,7 @@ namespace NightEmber;
 /// <summary>
 /// Provides the Night Ember application entry point and lifecycle coordination.
 /// </summary>
-public sealed partial class App : Application, IDisposable
+public sealed partial class App : IDisposable
 {
     private SingleInstanceService? _singleInstance;
     private WatchdogService? _watchdog;
@@ -29,33 +28,6 @@ public sealed partial class App : Application, IDisposable
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-
-        if (e.Args.Length > 0 && string.Equals(e.Args[0], "--watchdog", StringComparison.Ordinal))
-        {
-            if (!WatchdogService.TryParseArguments(e.Args, out var processId, out var eventName))
-            {
-                // Never continue into a normal launch from a malformed internal command line.
-                Shutdown();
-                return;
-            }
-
-            try
-            {
-                WatchdogService.Run(processId, eventName);
-            }
-            catch (WaitHandleCannotBeOpenedException)
-            {
-                // A normal exit already reset the displays; after a crash this is the
-                // only remaining opportunity to recover a stranded gamma ramp.
-                GammaService.ResetAllDisplays();
-            }
-            finally
-            {
-                Shutdown();
-            }
-
-            return;
-        }
 
         var hidden = e.Args.Contains("--hidden", StringComparer.OrdinalIgnoreCase);
         _singleInstance?.Dispose();

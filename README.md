@@ -7,7 +7,7 @@ display's gamma ramp and runs quietly in the system tray.
 
 ## Features
 
-- Adjustable warmth from 6500 K down to 1200 K
+- Adjustable warmth from 6500 K down to 1900 K
 - Adjustable brightness from 100% (no dimming) down to 50%, using software dimming
 - Manual, sunset-to-sunrise, and custom-hour schedules
 - Offline sunrise and sunset estimates with no location permission or network access
@@ -37,6 +37,23 @@ from the tray menu to stop the application and restore neutral display gamma.
 
 A manual tray toggle temporarily overrides an active schedule. The override expires when the schedule next changes
 naturally.
+
+## Verify a download
+
+Each release includes `NightEmber.exe.sha256` and a GitHub build-provenance attestation. To confirm the file is intact,
+compare its hash with the value in `NightEmber.exe.sha256`:
+
+```powershell
+(Get-FileHash .\NightEmber.exe -Algorithm SHA256).Hash
+```
+
+To confirm the file was built by this repository's release workflow, use the GitHub CLI:
+
+```powershell
+gh attestation verify .\NightEmber.exe --repo austins/NightEmber
+```
+
+The executable is not code-signed, so Windows SmartScreen may still warn about an unknown publisher.
 
 ## Keyboard access
 
@@ -77,7 +94,7 @@ Settings are saved as `NightEmber.config.json` beside `NightEmber.exe`:
 
 | Setting       | Range                        | Default  | Purpose                                   |
 |---------------|------------------------------|----------|-------------------------------------------|
-| `Temperature` | 1200-6500                    | `3400`   | Color temperature while enabled           |
+| `Temperature` | 1900-6500                    | `3400`   | Color temperature while enabled           |
 | `Brightness`  | 50-100                       | `100`    | Brightness percentage (100% = no dimming) |
 | `Mode`        | `Manual`, `Sunset`, `Custom` | `Sunset` | Scheduling mode                           |
 | `CustomOn`    | `HH:mm`                      | `21:00`  | Custom schedule start                     |
@@ -89,6 +106,8 @@ protected folders such as `Program Files` prevent the portable configuration fro
 
 Configuration values are validated when loaded. Invalid values use safe defaults, and malformed or inaccessible files
 produce a visible warning. Saves use a temporary file and atomic replacement to reduce the chance of corruption.
+Temperatures from 1200 K to 1899 K saved by earlier versions are raised to 1900 K, the warmest setting drivers can
+display distinctly.
 
 ## Sunset schedule
 
@@ -101,6 +120,10 @@ time, especially when an equatorial fallback is used.
 
 Select **Start automatically when I sign in** and save. Night Ember creates a shortcut in the current user's Startup
 folder with the `--hidden` option. Clearing the setting removes that shortcut. No elevation or registry change is used.
+
+Only one Night Ember startup shortcut exists per user. The setting shows as enabled only when that shortcut launches the
+copy you are configuring; clearing it leaves a shortcut that launches another existing copy untouched. A shortcut that
+points to a moved or deleted copy is replaced or removed.
 
 ## Build
 
@@ -131,21 +154,32 @@ application installer is required.
 ## Display behavior and cleanup
 
 Gamma ramps live in the display driver rather than the application process. Night Ember therefore starts a second,
-minimal instance of its own executable as a watchdog. Normal shutdown signals the watchdog and restores neutral gamma
+minimal instance of its own executable as a watchdog; it does not load the WPF user interface. The watchdog is started
+through a short-lived launcher so it is not part of the main process tree, which lets it survive tools that kill a whole
+process tree, such as an IDE's **Stop** command. Normal shutdown signals the watchdog and restores neutral gamma
 directly. If the main process is terminated unexpectedly, the watchdog detects that exit and restores every display.
 
-Some display drivers reject strong gamma ramps. Night Ember clamps channel values to the minimum accepted by Windows and
-retries once after rebuilding stale display handles. Hardware and driver behavior can still limit the visible strength
-on some systems.
+If Night Ember crashes, the unhandled error is appended to `NightEmber.log` beside the executable. The log starts over
+once it exceeds 1 MB.
+
+When Windows begins signing out or shutting down, Night Ember restores neutral gamma and exits. If the sign-out or
+shutdown is then cancelled, start Night Ember again to restore the tint.
+
+Some display drivers reject strong gamma ramps. Night Ember keeps every channel at or above half strength, the minimum
+accepted by Windows, and retries once after rebuilding stale display handles. Hardware and driver behavior can still
+limit the visible strength on some systems.
+
+Because of that floor, brightness dims only the range above half strength, and warm colors become less saturated as
+brightness decreases. At 50% brightness every channel sits at the floor, so the display is dimmed evenly without a warm
+tint.
 
 Windows applies gamma ramps globally through a legacy, driver-dependent API that can take up to 200 milliseconds on some
 hardware. The display may briefly flicker or appear gray while a ramp is applied or restored. Windows can also reset the
 ramp during display changes, and behavior is undefined with HDR or other color-calibration software. See Microsoft's
 [`SetDeviceGammaRamp` documentation](https://learn.microsoft.com/windows/win32/api/wingdi/nf-wingdi-setdevicegammaramp).
 
-Force-stopping an entire process tree, as some IDE **Stop** commands do, can terminate both Night Ember and its watchdog
-before either can restore neutral gamma. Exit through the tray before stopping a debug session. If a tint remains,
-relaunch Night Ember and choose **Exit**.
+If the watchdog is also terminated, for example by ending it in Task Manager, a tint can remain. Relaunch Night Ember and
+choose **Exit** to restore neutral gamma.
 
 Software dimming reduces the display signal, not the physical backlight. Lowering a monitor's actual backlight is
 generally preferable when available.

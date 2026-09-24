@@ -74,9 +74,8 @@ internal static class InputValidation
         }
     }
 
-    internal static void FocusEditor(UserControl control)
+    internal static void FocusEditor(TextBox input)
     {
-        var input = (TextBox)control.FindName("ValueTextBox");
         input.Focus();
         input.BringIntoView();
     }

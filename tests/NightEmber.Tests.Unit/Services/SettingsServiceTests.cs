@@ -95,6 +95,23 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void Load_PartialFile_KeepsDefaultsForMissingValues()
+    {
+        // Arrange
+        File.WriteAllText(_configPath, """{ "Temperature": 2500 }""");
+
+        // Act
+        var result = _service.Load();
+
+        // Assert
+        result.Settings.Temperature.Should().Be(2500);
+        result.Settings.Should().BeEquivalentTo(
+            AppSettings.Default,
+            static options => options.Excluding(static settings => settings.Temperature));
+        result.Warning.Should().BeNull();
+    }
+
+    [Fact]
     public void Load_JsonNull_ReturnsDefaultsAndEmptyFileWarning()
     {
         // Arrange
@@ -149,7 +166,7 @@ public sealed class SettingsServiceTests : IDisposable
         // Arrange
         var settings = new AppSettings
         {
-            Temperature = 1800,
+            Temperature = 2000,
             Brightness = 65,
             Mode = ScheduleMode.Manual,
             CustomOn = "20:15",

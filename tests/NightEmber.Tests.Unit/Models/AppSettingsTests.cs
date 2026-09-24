@@ -51,7 +51,7 @@ public sealed class AppSettingsTests
     }
 
     [Theory]
-    [InlineData(1200, 50, 0)]
+    [InlineData(1900, 50, 0)]
     [InlineData(6500, 100, 5000)]
     public void Normalize_BoundaryValues_PreservesValues(int temperature, int brightness, int fadeMs)
     {
@@ -71,6 +71,22 @@ public sealed class AppSettingsTests
 
         // Assert
         normalized.Should().BeEquivalentTo(settings);
+    }
+
+    [Theory]
+    [InlineData(1200)]
+    [InlineData(1500)]
+    [InlineData(1899)]
+    public void Normalize_LegacyLowTemperature_RaisesToMinimum(int temperature)
+    {
+        // Arrange
+        var settings = new AppSettings { Temperature = temperature };
+
+        // Act
+        var normalized = settings.Normalize();
+
+        // Assert
+        normalized.Temperature.Should().Be(AppSettings.MinimumTemperature);
     }
 
     [Theory]

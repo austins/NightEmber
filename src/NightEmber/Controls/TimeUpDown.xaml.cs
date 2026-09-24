@@ -12,7 +12,7 @@ namespace NightEmber.Controls;
 /// time or select the hour, minute, or day-period segment and adjust it with the
 /// spinner buttons, arrow keys, or mouse wheel.
 /// </remarks>
-public sealed partial class TimeUpDown : System.Windows.Controls.UserControl
+public sealed partial class TimeUpDown
 {
     /// <summary>
     /// Identifies the <see cref="MinuteIncrement" /> dependency property.

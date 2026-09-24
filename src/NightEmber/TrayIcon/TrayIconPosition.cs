@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
+using Matrix = System.Windows.Media.Matrix;
 
 namespace NightEmber.TrayIcon;
 
@@ -36,7 +37,7 @@ internal static class TrayIconPosition
 
         // Match H.NotifyIcon's physical-pixel to WPF desktop-coordinate conversion.
         using var source = new HwndSource(default);
-        var transform = source.CompositionTarget.TransformFromDevice;
+        var transform = source.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
         var position = transform.Transform(new System.Windows.Point(point.X, point.Y));
         return new Point((int)position.X, (int)position.Y);
     }

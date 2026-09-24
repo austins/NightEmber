@@ -79,13 +79,35 @@ public sealed class MainWindowTests
             // Act
             strength.Value = 40;
             brightness.Value = 80;
+            var appliedBeforeDispatch = fixture.Gamma.Applied.Count;
+            WpfTestHelper.FlushDispatcher();
             var preview = fixture.Gamma.Applied[^1];
             cancel.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
 
             // Assert
+            appliedBeforeDispatch.Should().Be(0);
             preview.Should().Be((MainWindow.StrengthToTemperature(40), 80d));
+            fixture.Gamma.Applied.Should().HaveCount(2);
             fixture.Gamma.Applied[^1].Should().Be((3400d, 75d));
             fixture.Runtime.Saved.Should().BeNull();
+        });
+    }
+
+    [Fact]
+    public async Task Close_WithPendingSliderPreview_DiscardsPreview()
+    {
+        await WithWindow((window, fixture) =>
+        {
+            // Arrange
+            var strength = (Slider)window.FindName("StrengthSlider");
+
+            // Act
+            strength.Value = 40;
+            window.Close();
+            WpfTestHelper.FlushDispatcher();
+
+            // Assert
+            fixture.Gamma.Applied.Should().BeEmpty();
         });
     }
 
@@ -210,12 +232,12 @@ public sealed class MainWindowTests
     }
 
     [Theory]
-    [InlineData(3400, 58, 3400)]
-    [InlineData(3400, 58.4, 3400)]
-    [InlineData(3400, 58.5, 3400)]
-    [InlineData(3400, 58.6, 3373)]
+    [InlineData(3400, 67, 3400)]
+    [InlineData(3400, 67.4, 3400)]
+    [InlineData(3400, 66.5, 3464)]
+    [InlineData(3400, 67.6, 3372)]
     [InlineData(6500, -1, 6500)]
-    [InlineData(1200, 101, 1200)]
+    [InlineData(1900, 101, 1900)]
     public void BuildSettings_Strength_PreservesUnchangedTemperatureOrRoundsAndClamps(
         int original,
         double strength,
@@ -245,7 +267,7 @@ public sealed class MainWindowTests
         var customOff = new TimeSpan(7, 5, 0);
 
         // Act
-        var settings = MainWindow.BuildSettings(3400, 58, brightness, (ScheduleMode)mode, customOn, customOff, 1234);
+        var settings = MainWindow.BuildSettings(3400, 67, brightness, (ScheduleMode)mode, customOn, customOff, 1234);
 
         // Assert
         settings.Brightness.Should().Be(expectedBrightness);
@@ -257,8 +279,8 @@ public sealed class MainWindowTests
 
     [Theory]
     [InlineData(6500, 0)]
-    [InlineData(3400, 58)]
-    [InlineData(1200, 100)]
+    [InlineData(3400, 67)]
+    [InlineData(1900, 100)]
     public void TemperatureToStrength_KnownTemperature_ReturnsExpectedStrength(int temperature, int expected)
     {
         // Act
@@ -271,11 +293,11 @@ public sealed class MainWindowTests
     [Theory]
     [InlineData(-1, 6500)]
     [InlineData(0, 6500)]
-    [InlineData(1, 6447)]
-    [InlineData(50, 3850)]
-    [InlineData(99, 1253)]
-    [InlineData(100, 1200)]
-    [InlineData(101, 1200)]
+    [InlineData(1, 6454)]
+    [InlineData(50, 4200)]
+    [InlineData(99, 1946)]
+    [InlineData(100, 1900)]
+    [InlineData(101, 1900)]
     public void StrengthToTemperature_Strength_ClampsAndConvertsTemperature(int strength, int expected)
     {
         // Act
@@ -286,19 +308,16 @@ public sealed class MainWindowTests
     }
 
     [Theory]
-    [InlineData(true, 21, 7, true)]
-    [InlineData(true, 0, 1, true)]
-    [InlineData(true, 7, 7, false)]
-    [InlineData(false, 7, 7, true)]
+    [InlineData(21, 7, true)]
+    [InlineData(0, 1, true)]
+    [InlineData(7, 7, false)]
     public void IsCustomWindowValid_ScheduleTimes_DetectsZeroLengthWindow(
-        bool isCustomMode,
         int onHours,
         int offHours,
         bool expected)
     {
         // Act
         var result = MainWindow.IsCustomWindowValid(
-            isCustomMode,
             TimeSpan.FromHours(onHours),
             TimeSpan.FromHours(offHours));
 
@@ -314,7 +333,7 @@ public sealed class MainWindowTests
         var off = new TimeSpan(21, 0, 45);
 
         // Act
-        var result = MainWindow.IsCustomWindowValid(true, on, off);
+        var result = MainWindow.IsCustomWindowValid(on, off);
 
         // Assert
         result.Should().BeFalse();
