@@ -41,6 +41,7 @@ jobs:
                 working-directory: ./src/NightEmber/bin/publish/win-x64
                 run: |
                     $hash = (Get-FileHash -Algorithm SHA256 NightEmber.exe).Hash.ToLowerInvariant()
+                    # sha256sum format ("<hash>  <file>" with two spaces and a trailing newline) so `sha256sum -c` can verify it.
                     [System.IO.File]::WriteAllText("$PWD/NightEmber.exe.sha256", "$hash  NightEmber.exe`n")
             -   name: Attest build provenance
                 uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
