@@ -206,14 +206,17 @@ internal static class SolarCalculator
         var utcDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
         var local = TimeZoneInfo.ConvertTimeFromUtc(utcDate.AddHours(universalTime), timeZone);
 
+        // Shift the UTC day and reconvert so a date correction also updates the daylight-saving offset.
         while (local.Date < date.Date)
         {
-            local = local.AddDays(1);
+            utcDate = utcDate.AddDays(1);
+            local = TimeZoneInfo.ConvertTimeFromUtc(utcDate.AddHours(universalTime), timeZone);
         }
 
         while (local.Date > date.Date)
         {
-            local = local.AddDays(-1);
+            utcDate = utcDate.AddDays(-1);
+            local = TimeZoneInfo.ConvertTimeFromUtc(utcDate.AddHours(universalTime), timeZone);
         }
 
         return local;

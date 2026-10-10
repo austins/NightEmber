@@ -2,6 +2,7 @@ using Microsoft.Win32;
 using NightEmber.Display;
 using NightEmber.Models;
 using NightEmber.Services;
+using NightEmber.Tests.Unit.Display;
 
 namespace NightEmber.Tests.Unit.Services;
 
@@ -320,11 +321,19 @@ public sealed class AppControllerTests
         fixture.Runtime.Posted.Should().BeEmpty();
     }
 
-    [Fact]
-    public void ReapplyDisplays_DisplayOpenFails_DoesNotApplyAndAllowsLaterRetry()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReapplyDisplays_DisplayOpenFails_RetriesWithoutAnotherNotification(bool preview)
     {
         // Arrange
         using var fixture = new ControllerFixture();
+        if (preview)
+        {
+            fixture.Controller.Preview(4200, 90);
+        }
+
+        fixture.Events.Clear();
         fixture.Gamma.OpenException = new System.ComponentModel.Win32Exception("display unavailable");
 
         // Act
@@ -334,15 +343,16 @@ public sealed class AppControllerTests
 
         var eventsAfterFailure = fixture.Events.ToArray();
         var timerRunningAfterFailure = fixture.Runtime.Timers[2].IsRunning;
+        fixture.Runtime.Timers[2].Fire();
         fixture.Gamma.OpenException = null;
-        fixture.Controller.OnPowerModeChanged(fixture, new PowerModeChangedEventArgs(PowerModes.Resume));
-        fixture.Runtime.DrainPosted();
         fixture.Runtime.Timers[2].Fire();
 
         // Assert
         eventsAfterFailure.Should().Equal("open");
-        timerRunningAfterFailure.Should().BeFalse();
-        fixture.Events.Should().Equal("open", "open", "apply");
+        timerRunningAfterFailure.Should().BeTrue();
+        fixture.Events.Should().Equal("open", "open", "open", "apply");
+        fixture.Runtime.Timers[2].IsRunning.Should().BeFalse();
+        fixture.Gamma.Applied[^1].Should().Be(preview ? (4200d, 90d) : (3400d, 75d));
     }
 
     [Fact]
@@ -616,6 +626,104 @@ public sealed class AppControllerTests
         // Assert
         fixture.Events.Should().Equal("apply", "repair");
         fixture.Gamma.Applied.Should().Equal((3400d, 75d), (3400d, 75d));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void ReapplyDisplays_AllHandlesUnavailable_RetryRestoresActiveRamp(bool preview, bool on)
+    {
+        // Arrange
+        var events = new List<string>();
+        var runtime = new FakeRuntime(events);
+        var devices = new GammaServiceTests.FakeDevices();
+        using var controller = new AppController(
+            () => new GammaService(devices),
+            runtime,
+            () => { },
+            new AppSettings { Mode = ScheduleMode.Custom, FadeMs = 0 });
+        controller.UpdateSchedule(true);
+        if (!on)
+        {
+            controller.Toggle();
+        }
+
+        if (preview)
+        {
+            controller.Preview(4200, 80);
+        }
+
+        var expected = (ushort[])devices.CurrentRamps["first"].Clone();
+        devices.CurrentRamps.Clear();
+        devices.OpenResults.Enqueue(0);
+        devices.OpenResults.Enqueue(0);
+        controller.OnPowerModeChanged(runtime, new PowerModeChangedEventArgs(PowerModes.Resume));
+        runtime.DrainPosted();
+
+        // Act
+        runtime.Timers[2].Fire();
+        var retryPending = runtime.Timers[2].IsRunning;
+        runtime.Timers[2].Fire();
+
+        // Assert
+        retryPending.Should().BeTrue();
+        runtime.Timers[2].IsRunning.Should().BeFalse();
+        devices.OpenCount.Should().Be(6);
+        devices.CurrentRamps.Should().HaveCount(2);
+        devices.CurrentRamps.Values.Should().AllSatisfy(ramp => ramp.Should().Equal(expected));
+    }
+
+    [Fact]
+    public void Toggle_PartialEnableAndDisableFailures_RetriesUntilEveryDisplayIsNeutral()
+    {
+        // Arrange
+        var events = new List<string>();
+        var runtime = new FakeRuntime(events);
+        var devices = new GammaServiceTests.FakeDevices();
+        using var controller = new AppController(
+            () => new GammaService(devices),
+            runtime,
+            () => { },
+            new AppSettings { Mode = ScheduleMode.Custom, FadeMs = 0 });
+        var neutral = GammaRampBuilder.Build(1, 1, 1, 1, true);
+        foreach (var result in new[] { false, false, true, false, false, true })
+        {
+            devices.WriteResults.Enqueue(result);
+        }
+
+        controller.UpdateSchedule(true);
+        var tintedRamp = (ushort[])devices.CurrentRamps["second"].Clone();
+        foreach (var result in new[] { true, false, false, true, false, false })
+        {
+            devices.WriteResults.Enqueue(result);
+        }
+
+        // Act
+        controller.Toggle();
+        var retryPending = runtime.Timers[1].IsRunning;
+        var rampAfterFailedDisable = devices.CurrentRamps["second"];
+        for (var index = 0; index < 8; index++)
+        {
+            devices.WriteResults.Enqueue(false);
+        }
+
+        runtime.Timers[1].Fire();
+        var retryPendingAfterSecondFailure = runtime.Timers[1].IsRunning;
+        runtime.Timers[1].Fire();
+        var writesAfterRecovery = devices.Writes.Count;
+        runtime.Timers[1].Fire();
+        controller.UpdateSchedule(false);
+
+        // Assert
+        tintedRamp.Should().NotEqual(neutral);
+        rampAfterFailedDisable.Should().Equal(tintedRamp);
+        retryPending.Should().BeTrue();
+        retryPendingAfterSecondFailure.Should().BeTrue();
+        runtime.Timers[1].IsRunning.Should().BeFalse();
+        devices.CurrentRamps.Should().HaveCount(2);
+        devices.CurrentRamps.Values.Should().AllSatisfy(ramp => ramp.Should().Equal(neutral));
+        devices.Writes.Should().HaveCount(writesAfterRecovery);
     }
 
     [Fact]

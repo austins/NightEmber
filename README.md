@@ -14,6 +14,7 @@ display's gamma ramp and runs in the system tray.
 * Gradual transitions with a configurable duration
 * Multi-monitor support
 * Automatic recovery after display changes, unlock, or resume
+* Automatic retries when displays are temporarily unavailable or reject a tint or neutral ramp
 * Schedule updates when the Windows time or time zone changes
 * Gamma drift detection when another program resets a display
 * Tray toggle, settings window, and optional sign-in startup
@@ -97,6 +98,7 @@ Sunrise and sunset are calculated locally. Night Ember uses a representative lat
 and derives longitude from the UTC offset. Unrecognized time zones fall back to latitude zero, shown as an "equatorial
 estimate" in settings, rather than guessing a hemisphere. This avoids network access and location permissions, but the
 estimated times can differ from actual local sunrise and sunset, especially with the equatorial fallback.
+Daylight-saving offsets are evaluated for each sunrise and sunset on its local calendar date.
 
 ## Start at sign-in
 

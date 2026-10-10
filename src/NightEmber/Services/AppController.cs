@@ -45,6 +45,7 @@ internal sealed class AppController : IDisposable
     private bool _disposed;
     private bool _systemEventsSubscribed;
     private bool _neutralRestored;
+    private bool _gammaRetryNeeded;
     private double _currentKelvin = ColorTemperature.NeutralKelvin;
     private double _currentBrightness = NeutralBrightnessPercent;
     private double _targetKelvin = ColorTemperature.NeutralKelvin;
@@ -456,8 +457,11 @@ internal sealed class AppController : IDisposable
     {
         try
         {
+            // A failed multi-display write can still change some displays.
+            _neutralRestored = false;
             if (!_gammaService.Apply(kelvin, brightness))
             {
+                _gammaRetryNeeded = true;
                 ReportGammaError("The display driver rejected the requested gamma ramp.");
 
                 // Each rejected write already reopened every display; the drift timer retries later
@@ -469,10 +473,11 @@ internal sealed class AppController : IDisposable
 
             _currentKelvin = kelvin;
             _currentBrightness = brightness;
-            _neutralRestored = false;
+            _gammaRetryNeeded = false;
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
+            _gammaRetryNeeded = true;
             ReportGammaError(ex.Message);
             StopFade();
             UpdateDriftMonitoring();
@@ -486,7 +491,8 @@ internal sealed class AppController : IDisposable
             return;
         }
 
-        if (!GammaTransition.StatesMatch(_currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness))
+        if (_gammaRetryNeeded
+            || !GammaTransition.StatesMatch(_currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness))
         {
             // A previous write was rejected before the tint reached its target, including a fade to neutral.
             ApplyGamma(_targetKelvin, _targetBrightness);
@@ -516,7 +522,9 @@ internal sealed class AppController : IDisposable
         if (!IsExiting
             && (_isOn
                 || (_fadeTimer is null
-                    && !GammaTransition.StatesMatch(_currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness))))
+                    && (_gammaRetryNeeded
+                        || !GammaTransition.StatesMatch(
+                            _currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness)))))
         {
             _driftTimer.Start();
         }
@@ -561,6 +569,7 @@ internal sealed class AppController : IDisposable
         catch (Exception ex) when (IsDisplayException(ex))
         {
             ReportGammaError(ex.Message);
+            _reapplyTimer.Start();
         }
     }
 

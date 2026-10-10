@@ -1,3 +1,4 @@
+using NightEmber.Models;
 using NightEmber.Scheduling;
 
 namespace NightEmber.Tests.Unit.Scheduling;
@@ -203,6 +204,57 @@ public sealed class SolarCalculatorTests
         summerDaylight.Sunrise.Should().Be(summerStandard.Sunrise?.AddHours(1));
         summerDaylight.Sunset.Should().Be(summerStandard.Sunset?.AddHours(1));
         winterDaylight.Should().Be(winterStandard);
+    }
+
+    [Theory]
+    [InlineData("Pacific Standard Time", 3, 8, 1)]
+    [InlineData("Pacific Standard Time", 3, 9, 1)]
+    [InlineData("Pacific Standard Time", 11, 1, 0)]
+    [InlineData("Pacific Standard Time", 11, 2, 0)]
+    [InlineData("AUS Eastern Standard Time", 4, 5, 0)]
+    [InlineData("AUS Eastern Standard Time", 4, 6, 0)]
+    [InlineData("AUS Eastern Standard Time", 10, 4, 1)]
+    [InlineData("AUS Eastern Standard Time", 10, 5, 1)]
+    public void GetSunTimes_DaylightSavingBoundary_UsesEventDateOffset(
+        string zoneId, int month, int day, int daylightHours)
+    {
+        // Arrange
+        var date = CalendarDate(2026, month, day);
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+        var location = SolarCalculator.GetTimeZoneLocation(timeZone);
+        var standardZone = TimeZoneInfo.CreateCustomTimeZone(
+            "Fixed offset", timeZone.BaseUtcOffset, "Fixed offset", "Fixed offset");
+
+        // Act
+        var actual = SolarCalculator.GetSunTimes(location, date, timeZone);
+        var standard = SolarCalculator.GetSunTimes(location, date, standardZone);
+
+        // Assert
+        actual.Sunrise.Should().Be(standard.Sunrise?.AddHours(daylightHours));
+        actual.Sunset.Should().Be(standard.Sunset?.AddHours(daylightHours));
+        actual.Sunrise.Should().NotBeNull();
+        actual.Sunset.Should().NotBeNull();
+        actual.Sunrise.Value.Date.Should().Be(date);
+        actual.Sunset.Value.Date.Should().Be(date);
+    }
+
+    [Theory]
+    [InlineData(3, 8, 18, false)]
+    [InlineData(11, 1, 17, true)]
+    public void ShouldBeOn_PacificDaylightSavingBoundary_UsesCorrectSunset(
+        int month, int day, int hour, bool expected)
+    {
+        // Arrange
+        var now = CalendarDate(2026, month, day).AddHours(hour).AddMinutes(30);
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+        var location = SolarCalculator.GetTimeZoneLocation(timeZone);
+        var settings = new AppSettings { Mode = ScheduleMode.Sunset };
+
+        // Act
+        var on = ScheduleService.ShouldBeOn(settings, now, location, timeZone);
+
+        // Assert
+        on.Should().Be(expected);
     }
 
     [Theory]

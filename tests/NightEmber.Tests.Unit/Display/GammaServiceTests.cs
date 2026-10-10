@@ -321,9 +321,13 @@ public sealed class GammaServiceTests
         result.Should().Be(hasDrifted);
     }
 
-    private sealed class FakeDevices : IGammaDeviceApi
+    internal sealed class FakeDevices : IGammaDeviceApi
     {
+        private readonly Dictionary<nint, string> _deviceNamesByHandle = [];
+
         public string[] DeviceNames { get; init; } = ["first", "second"];
+
+        public Dictionary<string, ushort[]> CurrentRamps { get; } = [];
 
         public Queue<nint> OpenResults { get; } = new();
 
@@ -349,7 +353,13 @@ public sealed class GammaServiceTests
         public nint Open(string deviceName)
         {
             OpenCount++;
-            return OpenResults.TryDequeue(out var handle) ? handle : OpenCount;
+            var handle = OpenResults.TryDequeue(out var result) ? result : OpenCount;
+            if (handle != 0)
+            {
+                _deviceNamesByHandle[handle] = deviceName;
+            }
+
+            return handle;
         }
 
         public int GetLastError()
@@ -365,7 +375,13 @@ public sealed class GammaServiceTests
                 throw WriteException;
             }
 
-            return !WriteResults.TryDequeue(out var result) || result;
+            var accepted = !WriteResults.TryDequeue(out var result) || result;
+            if (accepted)
+            {
+                CurrentRamps[_deviceNamesByHandle[handle]] = (ushort[])ramp.Clone();
+            }
+
+            return accepted;
         }
 
         public bool Read(nint handle, ushort[] ramp)
