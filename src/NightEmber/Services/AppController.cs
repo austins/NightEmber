@@ -197,15 +197,13 @@ internal sealed class AppController : IDisposable
                 _window.WindowState = WindowState.Normal;
             }
 
-            _window.Show();
-            _window.Activate();
+            BringToFront(_window);
             return;
         }
 
         _window = new MainWindow(this);
         _window.Closed += (_, _) => _window = null;
-        _window.Show();
-        _window.Activate();
+        BringToFront(_window);
     }
 
     /// <summary>
@@ -700,5 +698,19 @@ internal sealed class AppController : IDisposable
     private static bool IsSettingsException(Exception exception)
     {
         return exception is IOException or UnauthorizedAccessException or System.Security.SecurityException;
+    }
+
+    private static void BringToFront(Window window)
+    {
+        window.Show();
+
+        // Windows can deny foreground activation while the tray menu is closing, leaving the
+        // window behind others with only a flashing taskbar button. Toggling Topmost raises it anyway.
+        if (!window.Activate())
+        {
+            window.Topmost = true;
+            window.Topmost = false;
+            window.Activate();
+        }
     }
 }
