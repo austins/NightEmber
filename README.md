@@ -111,8 +111,8 @@ points to a moved or deleted copy is replaced or removed.
 
 ## Verify a download
 
-Each release includes `NightEmber.exe.sha256` and a GitHub build-provenance attestation. To confirm the file is intact,
-compare its hash with the value in `NightEmber.exe.sha256`:
+Each release has a GitHub build-provenance attestation, and GitHub shows a SHA-256 digest beside every release asset.
+To confirm the file is intact, compare its hash with that digest:
 
 ```powershell
 (Get-FileHash .\NightEmber.exe -Algorithm SHA256).Hash
