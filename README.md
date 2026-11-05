@@ -137,7 +137,7 @@ dotnet build .\NightEmber.slnx
 ## Publish a self-contained portable executable
 
 ```powershell
-dotnet publish .\src\NightEmber\NightEmber.csproj --configuration Release /p:PublishProfile=win-x64 /p:RestoreLockedMode=true
+dotnet publish .\src\NightEmber\NightEmber.csproj --configuration Release /p:PublishProfile=win-x64
 ```
 
 The output, `src\NightEmber\bin\publish\win-x64\NightEmber.exe`, bundles the .NET runtime and targets 64-bit Windows,
