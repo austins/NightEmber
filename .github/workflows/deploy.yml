@@ -34,6 +34,8 @@ jobs:
                     "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             -   name: Checkout
                 uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+                with:
+                    persist-credentials: false
             -   uses: ./.github/actions/setup-dotnet-environment
             -   name: Publish executable
                 run: dotnet publish ./src/NightEmber -c Release /p:PublishProfile=win-x64 /p:Version=$env:VERSION
