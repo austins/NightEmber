@@ -128,7 +128,7 @@ The executable is not code-signed, so Windows SmartScreen may still warn about a
 
 ## Build
 
-Requires Windows and the .NET 10 SDK.
+Requires Windows and the .NET 11 SDK.
 
 ```powershell
 dotnet build .\NightEmber.slnx
