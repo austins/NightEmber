@@ -34,8 +34,8 @@ public sealed class WpfTestHelperTests
 
         // Assert
         results.Should().HaveCount(actionCount);
-        results.Select(result => result.Thread).Should().OnlyHaveUniqueItems();
-        results.Select(result => result.Dispatcher).Should().OnlyHaveUniqueItems();
+        results.Should().OnlyHaveUniqueItems(result => result.Thread);
+        results.Should().OnlyHaveUniqueItems(result => result.Dispatcher);
         results.Should().OnlyContain(result => result.Apartment == ApartmentState.STA);
         results.Should().OnlyContain(result => result.PreviousCleanupFinished);
         results.Should().OnlyContain(result => result.Dispatcher.HasShutdownFinished);

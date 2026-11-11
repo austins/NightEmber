@@ -27,8 +27,8 @@ public sealed class MainWindowTests
         {
             // Arrange
             window.FlowDirection = flowDirection;
-            var current = (RadioButton)window.FindName("CustomModeRadio");
-            var expected = (RadioButton)window.FindName(expectedRadio);
+            var current = (RadioButton)window.FindName("CustomModeRadio")!;
+            var expected = (RadioButton)window.FindName(expectedRadio)!;
 
             // Act
             var args = WpfTestHelper.PressKey(current, key);
@@ -37,7 +37,7 @@ public sealed class MainWindowTests
             args.Handled.Should().BeTrue();
             expected.IsChecked.Should().BeTrue();
             current.IsChecked.Should().BeFalse();
-            ((Grid)window.FindName("CustomTimePanel")).IsEnabled.Should().BeFalse();
+            ((Grid)window.FindName("CustomTimePanel")!).IsEnabled.Should().BeFalse();
         });
     }
 
@@ -52,7 +52,7 @@ public sealed class MainWindowTests
         await WithWindow((window, _) =>
         {
             // Arrange
-            var current = (RadioButton)window.FindName("CustomModeRadio");
+            var current = (RadioButton)window.FindName("CustomModeRadio")!;
 
             // Act
             var args = WpfTestHelper.PressKey(current, key, modifiers);
@@ -60,7 +60,7 @@ public sealed class MainWindowTests
             // Assert
             args.Handled.Should().BeFalse();
             current.IsChecked.Should().BeTrue();
-            ((Grid)window.FindName("CustomTimePanel")).IsEnabled.Should().BeTrue();
+            ((Grid)window.FindName("CustomTimePanel")!).IsEnabled.Should().BeTrue();
         });
     }
 
@@ -70,8 +70,8 @@ public sealed class MainWindowTests
         await WithWindow((window, fixture) =>
         {
             // Arrange
-            var strength = (Slider)window.FindName("StrengthSlider");
-            var brightness = (Slider)window.FindName("BrightnessSlider");
+            var strength = (Slider)window.FindName("StrengthSlider")!;
+            var brightness = (Slider)window.FindName("BrightnessSlider")!;
             var footer = (Grid)((Grid)window.Content).Children[1];
             var buttons = footer.Children.OfType<StackPanel>().Single();
             var cancel = buttons.Children.OfType<Button>().Single(static button => button.IsCancel);
@@ -99,7 +99,7 @@ public sealed class MainWindowTests
         await WithWindow((window, fixture) =>
         {
             // Arrange
-            var strength = (Slider)window.FindName("StrengthSlider");
+            var strength = (Slider)window.FindName("StrengthSlider")!;
 
             // Act
             strength.Value = 40;
@@ -125,8 +125,8 @@ public sealed class MainWindowTests
         await WithWindow((window, fixture) =>
         {
             // Arrange
-            var control = (UserControl)window.FindName(inputName);
-            var input = (TextBox)control.FindName("ValueTextBox");
+            var control = (UserControl)window.FindName(inputName)!;
+            var input = (TextBox)control.FindName("ValueTextBox")!;
             input.Text = text;
 
             // Act
@@ -137,7 +137,7 @@ public sealed class MainWindowTests
             fixture.Runtime.Saved.Should().BeNull();
             input.Text.Should().Be(text);
             InputValidation.GetHasError(control).Should().BeTrue();
-            var error = (TextBlock)window.FindName(errorName);
+            var error = (TextBlock)window.FindName(errorName)!;
             error.Text.Should().Contain(InputValidation.GetErrorMessage(control));
             error.Visibility.Should().Be(Visibility.Visible);
         });
@@ -149,12 +149,12 @@ public sealed class MainWindowTests
         await WithWindow((window, fixture) =>
         {
             // Arrange
-            var on = (TimeUpDown)window.FindName("CustomOnInput");
-            var off = (TimeUpDown)window.FindName("CustomOffInput");
-            var duration = (NumericUpDown)window.FindName("FadeDurationInput");
-            ((TextBox)on.FindName("ValueTextBox")).Text = "invalid";
-            ((TextBox)off.FindName("ValueTextBox")).Text = "invalid";
-            ((TextBox)duration.FindName("ValueTextBox")).Text = "5001";
+            var on = (TimeUpDown)window.FindName("CustomOnInput")!;
+            var off = (TimeUpDown)window.FindName("CustomOffInput")!;
+            var duration = (NumericUpDown)window.FindName("FadeDurationInput")!;
+            ((TextBox)on.FindName("ValueTextBox")!).Text = "invalid";
+            ((TextBox)off.FindName("ValueTextBox")!).Text = "invalid";
+            ((TextBox)duration.FindName("ValueTextBox")!).Text = "5001";
 
             // Act
             Save(window);
@@ -164,9 +164,9 @@ public sealed class MainWindowTests
                 InputValidation.GetHasError(off),
                 InputValidation.GetHasError(duration)
             };
-            ((TextBox)on.FindName("ValueTextBox")).Text = "22:30";
-            ((TextBox)off.FindName("ValueTextBox")).Text = "06:15";
-            ((TextBox)duration.FindName("ValueTextBox")).Text = "5000";
+            ((TextBox)on.FindName("ValueTextBox")!).Text = "22:30";
+            ((TextBox)off.FindName("ValueTextBox")!).Text = "06:15";
+            ((TextBox)duration.FindName("ValueTextBox")!).Text = "5000";
             Save(window);
 
             // Assert
@@ -186,10 +186,10 @@ public sealed class MainWindowTests
         await WithWindow((window, fixture) =>
         {
             // Arrange
-            var on = (TimeUpDown)window.FindName("CustomOnInput");
-            ((TextBox)on.FindName("ValueTextBox")).Text = "invalid";
+            var on = (TimeUpDown)window.FindName("CustomOnInput")!;
+            ((TextBox)on.FindName("ValueTextBox")!).Text = "invalid";
             on.CommitEdit();
-            ((RadioButton)window.FindName(radioName)).IsChecked = true;
+            ((RadioButton)window.FindName(radioName)!).IsChecked = true;
 
             // Act
             Save(window);
@@ -198,7 +198,7 @@ public sealed class MainWindowTests
             fixture.Runtime.Saved.Should().NotBeNull();
             fixture.Runtime.Saved.Mode.Should().Be((ScheduleMode)mode);
             fixture.Runtime.Saved.CustomOn.Should().Be("21:00");
-            var error = (TextBlock)window.FindName("CustomOnErrorText");
+            var error = (TextBlock)window.FindName("CustomOnErrorText")!;
             ((StackPanel)error.Parent).Visibility.Should().Be(Visibility.Collapsed);
         });
     }
@@ -209,13 +209,13 @@ public sealed class MainWindowTests
         await WithWindow((window, fixture) =>
         {
             // Arrange
-            var off = (TimeUpDown)window.FindName("CustomOffInput");
-            var input = (TextBox)off.FindName("ValueTextBox");
+            var off = (TimeUpDown)window.FindName("CustomOffInput")!;
+            var input = (TextBox)off.FindName("ValueTextBox")!;
             input.Text = "21:00";
 
             // Act
             Save(window);
-            var error = (TextBlock)window.FindName("ScheduleErrorText");
+            var error = (TextBlock)window.FindName("ScheduleErrorText")!;
             var message = error.Text;
             var savedBeforeCorrection = fixture.Runtime.Saved;
             input.Text = "07:00";
@@ -311,15 +311,10 @@ public sealed class MainWindowTests
     [InlineData(21, 7, true)]
     [InlineData(0, 1, true)]
     [InlineData(7, 7, false)]
-    public void IsCustomWindowValid_ScheduleTimes_DetectsZeroLengthWindow(
-        int onHours,
-        int offHours,
-        bool expected)
+    public void IsCustomWindowValid_ScheduleTimes_DetectsZeroLengthWindow(int onHours, int offHours, bool expected)
     {
         // Act
-        var result = MainWindow.IsCustomWindowValid(
-            TimeSpan.FromHours(onHours),
-            TimeSpan.FromHours(offHours));
+        var result = MainWindow.IsCustomWindowValid(TimeSpan.FromHours(onHours), TimeSpan.FromHours(offHours));
 
         // Assert
         result.Should().Be(expected);
@@ -359,6 +354,6 @@ public sealed class MainWindowTests
 
     private static void Save(MainWindow window)
     {
-        ((Button)window.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        ((Button)window.FindName("SaveButton")!).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
     }
 }

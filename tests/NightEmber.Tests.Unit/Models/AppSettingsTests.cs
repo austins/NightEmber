@@ -164,7 +164,7 @@ public sealed class AppSettingsTests
 
         // Assert
         parsed.Should().BeFalse();
-        result.Should().Be(default);
+        result.Should().Be(TimeSpan.Zero);
     }
 
     [Theory]

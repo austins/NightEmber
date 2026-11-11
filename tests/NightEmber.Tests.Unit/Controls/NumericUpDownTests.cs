@@ -295,6 +295,6 @@ public sealed class NumericUpDownTests
 
     private static TextBox Input(NumericUpDown control)
     {
-        return (TextBox)control.FindName("ValueTextBox");
+        return (TextBox)control.FindName("ValueTextBox")!;
     }
 }

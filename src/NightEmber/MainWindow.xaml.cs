@@ -84,10 +84,9 @@ public sealed partial class MainWindow
         var roundedStrength = (int)Math.Round(strength);
         return new AppSettings
         {
-            Temperature =
-                roundedStrength == TemperatureToStrength(originalTemperature)
-                    ? originalTemperature
-                    : StrengthToTemperature(roundedStrength),
+            Temperature = roundedStrength == TemperatureToStrength(originalTemperature)
+                ? originalTemperature
+                : StrengthToTemperature(roundedStrength),
             Brightness = (int)Math.Round(brightness),
             Mode = mode,
             CustomOn = AppSettings.FormatTime(customOn),
@@ -173,8 +172,12 @@ public sealed partial class MainWindow
         {
             Key.Up => -1,
             Key.Down => 1,
-            Key.Left => FlowDirection == FlowDirection.RightToLeft ? 1 : -1,
-            Key.Right => FlowDirection == FlowDirection.RightToLeft ? -1 : 1,
+            Key.Left => FlowDirection == FlowDirection.RightToLeft
+                ? 1
+                : -1,
+            Key.Right => FlowDirection == FlowDirection.RightToLeft
+                ? -1
+                : 1,
             _ => 0
         };
 
@@ -202,8 +205,11 @@ public sealed partial class MainWindow
             _originalTemperature,
             StrengthSlider.Value,
             BrightnessSlider.Value,
-            SunsetModeRadio.IsChecked == true ? ScheduleMode.Sunset :
-            CustomModeRadio.IsChecked == true ? ScheduleMode.Custom : ScheduleMode.Manual,
+            SunsetModeRadio.IsChecked == true
+                ? ScheduleMode.Sunset
+                : CustomModeRadio.IsChecked == true
+                    ? ScheduleMode.Custom
+                    : ScheduleMode.Manual,
             CustomOnInput.TimeValue,
             CustomOffInput.TimeValue,
             FadeDurationInput.NumericValue);
@@ -251,7 +257,9 @@ public sealed partial class MainWindow
         var temperature = StrengthToTemperature(strength);
         var brightness = (int)Math.Round(BrightnessSlider.Value);
         StrengthValueText.Text = $"{strength}% ({temperature} K)";
-        BrightnessValueText.Text = brightness == 100 ? "100% (no dimming)" : $"{brightness}%";
+        BrightnessValueText.Text = brightness == 100
+            ? "100% (no dimming)"
+            : $"{brightness}%";
     }
 
     private void UpdateScheduleControls()
@@ -269,9 +277,14 @@ public sealed partial class MainWindow
         var durationValid = FadeDurationInput.CommitEdit();
         var scheduleValid = UpdateScheduleValidation();
 
-        var invalidInput = !onValid ? CustomOnInput.ValueTextBox :
-            !offValid || !scheduleValid ? CustomOffInput.ValueTextBox :
-            !durationValid ? FadeDurationInput.ValueTextBox : null;
+        var invalidInput = !onValid
+            ? CustomOnInput.ValueTextBox
+            : !offValid || !scheduleValid
+                ? CustomOffInput.ValueTextBox
+                : !durationValid
+                    ? FadeDurationInput.ValueTextBox
+                    : null;
+
         if (invalidInput is null)
         {
             return true;

@@ -20,7 +20,7 @@ public sealed class TrayIconServiceTests
             // Arrange
             using var icon = new TaskbarIcon();
             using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
             menu.Resources.MergedDictionaries.Add(
                 new ResourceDictionary
                 {
@@ -38,8 +38,8 @@ public sealed class TrayIconServiceTests
 
             // Assert
             initialSize.Should().Be(default(Size));
-            menu.DesiredSize.Width.Should().BeGreaterThan(0);
-            menu.DesiredSize.Height.Should().BeGreaterThan(0);
+            menu.DesiredSize.Width.Should().BePositive();
+            menu.DesiredSize.Height.Should().BePositive();
             menu.IsMeasureValid.Should().BeTrue();
             menu.IsArrangeValid.Should().BeTrue();
             menu.Items.OfType<Control>().Should().OnlyContain(item => item.Template != null);
@@ -61,7 +61,7 @@ public sealed class TrayIconServiceTests
             // Arrange
             using var icon = new TaskbarIcon();
             using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
 
             // Act
             if (dispose)
@@ -92,7 +92,7 @@ public sealed class TrayIconServiceTests
             // Arrange
             using var icon = new TaskbarIcon();
             using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
             var applicationResources = new ResourceDictionary();
             menu.Resources.MergedDictionaries.Add(applicationResources);
             var backgrounds = new List<System.Windows.Media.Brush>();
@@ -188,11 +188,11 @@ public sealed class TrayIconServiceTests
             var settings = 0;
             var exits = 0;
             using var service = new TrayIconService(icon, () => toggles++, () => settings++, () => exits++);
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
 
-            var toggle = (MenuItem)menu.Items[0];
-            var showSettings = (MenuItem)menu.Items[2];
-            var exit = (MenuItem)menu.Items[4];
+            var toggle = (MenuItem)menu.Items[0]!;
+            var showSettings = (MenuItem)menu.Items[2]!;
+            var exit = (MenuItem)menu.Items[4]!;
 
             // Act
             toggle.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
@@ -267,7 +267,7 @@ public sealed class TrayIconServiceTests
                 },
                 () => focused++,
                 () => restored++);
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
 
             // Act
             icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
@@ -306,7 +306,7 @@ public sealed class TrayIconServiceTests
                 },
                 () => focusChanges++,
                 () => focusChanges++);
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
 
             // Act
             icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
@@ -341,11 +341,11 @@ public sealed class TrayIconServiceTests
                 static () => true,
                 static () => { },
                 () => restored++);
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
 
             // Act
             icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
-            ((MenuItem)menu.Items[itemIndex]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            ((MenuItem)menu.Items[itemIndex]!).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             menu.RaiseEvent(new RoutedEventArgs(ContextMenu.ClosedEvent));
 
             // Assert
@@ -371,7 +371,7 @@ public sealed class TrayIconServiceTests
                 static () => true,
                 () => focusChanges++,
                 () => focusChanges++);
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
 
             // Act
             menu.RaiseEvent(new RoutedEventArgs(ContextMenu.OpenedEvent));
@@ -392,7 +392,7 @@ public sealed class TrayIconServiceTests
             // Arrange
             using var icon = new TaskbarIcon();
             using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
-            var toggle = (MenuItem)icon.ContextMenu.Items[0];
+            var toggle = (MenuItem)icon.ContextMenu!.Items[0]!;
             var offHandle = icon.TrayIcon.Icon;
             var results =
                 new List<(bool IsOn, object Header, string Tooltip, bool OwnsIcon, nint Handle, bool Created)>();
@@ -462,7 +462,7 @@ public sealed class TrayIconServiceTests
             // Arrange
             using var icon = new TaskbarIcon();
             using var service = new TrayIconService(icon, static () => { }, static () => { }, static () => { });
-            var toggle = (MenuItem)icon.ContextMenu.Items[0];
+            var toggle = (MenuItem)icon.ContextMenu!.Items[0]!;
 
             // Act
             service.Update(isOn, "Night Ember test state");
@@ -493,7 +493,7 @@ public sealed class TrayIconServiceTests
                 static () => true,
                 () => focused++,
                 () => restored++);
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
             icon.RaiseEvent(new RoutedEventArgs(TaskbarIcon.TrayKeyboardContextMenuEvent));
 
             // Act
@@ -529,7 +529,7 @@ public sealed class TrayIconServiceTests
                 },
                 () => callbacks++,
                 () => callbacks++);
-            var menu = icon.ContextMenu;
+            var menu = icon.ContextMenu!;
             menu.Resources.MergedDictionaries.Add(new ResourceDictionary());
             var items = menu.Items.OfType<MenuItem>().ToArray();
 

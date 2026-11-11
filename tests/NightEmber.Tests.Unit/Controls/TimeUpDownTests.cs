@@ -335,7 +335,7 @@ public sealed class TimeUpDownTests
 
     private static TextBox Input(TimeUpDown control)
     {
-        return (TextBox)control.FindName("ValueTextBox");
+        return (TextBox)control.FindName("ValueTextBox")!;
     }
 
     private static void SetCulture(string name, string shortTimePattern)

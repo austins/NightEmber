@@ -422,7 +422,7 @@ public sealed class AppControllerTests
 
         // Assert
         timerRunningAfterFailure.Should().BeFalse();
-        fixture.Gamma.Applied.Should().HaveCount(1);
+        fixture.Gamma.Applied.Should().ContainSingle();
     }
 
     [Fact]
@@ -642,7 +642,11 @@ public sealed class AppControllerTests
             () => new GammaService(devices),
             runtime,
             () => { },
-            new AppSettings { Mode = ScheduleMode.Custom, FadeMs = 0 });
+            new AppSettings
+            {
+                Mode = ScheduleMode.Custom,
+                FadeMs = 0
+            });
         controller.UpdateSchedule(true);
         if (!on)
         {
@@ -685,7 +689,11 @@ public sealed class AppControllerTests
             () => new GammaService(devices),
             runtime,
             () => { },
-            new AppSettings { Mode = ScheduleMode.Custom, FadeMs = 0 });
+            new AppSettings
+            {
+                Mode = ScheduleMode.Custom,
+                FadeMs = 0
+            });
         var neutral = GammaRampBuilder.Build(1, 1, 1, 1, true);
         foreach (var result in new[] { false, false, true, false, false, true })
         {

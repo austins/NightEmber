@@ -66,9 +66,11 @@ internal static class ColorTemperature
             ? GreenLogCoefficient * Math.Log(temperature) - GreenLogAdjustment
             : GreenPowerCoefficient * Math.Pow(temperature - GreenPowerOffset, GreenPowerExponent);
 
-        var blue = temperature >= RedGreenThreshold ? MaximumChannelValue :
-            temperature <= BlueThreshold ? 0 :
-            BlueLogCoefficient * Math.Log(temperature - BlueLogOffset) - BlueLogAdjustment;
+        var blue = temperature >= RedGreenThreshold
+            ? MaximumChannelValue
+            : temperature <= BlueThreshold
+                ? 0
+                : BlueLogCoefficient * Math.Log(temperature - BlueLogOffset) - BlueLogAdjustment;
 
         return new RgbMultipliers(
             Math.Clamp(red, 0, MaximumChannelValue) / MaximumChannelValue,
