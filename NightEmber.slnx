@@ -23,9 +23,14 @@
         <File Path=".github/workflows/test.yml" />
     </Folder>
     <Folder Name="/src/">
+        <Project Path="src/NightEmber.Core/NightEmber.Core.csproj" />
         <Project Path="src/NightEmber/NightEmber.csproj" />
     </Folder>
     <Folder Name="/tests/">
+        <File Path="tests/.editorconfig" />
+        <File Path="tests/TestProject.props" />
+        <Project Path="tests/NightEmber.Core.Tests.Unit/NightEmber.Core.Tests.Unit.csproj" />
+        <Project Path="tests/NightEmber.Tests.Shared/NightEmber.Tests.Shared.csproj" />
         <Project Path="tests/NightEmber.Tests.Unit/NightEmber.Tests.Unit.csproj" />
     </Folder>
 </Solution>

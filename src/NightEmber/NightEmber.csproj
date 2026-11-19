@@ -18,6 +18,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\NightEmber.Core\NightEmber.Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <InternalsVisibleTo Include="$(AssemblyName).Tests.Unit"/>
     </ItemGroup>
 

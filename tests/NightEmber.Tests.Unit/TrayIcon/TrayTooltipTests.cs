@@ -1,4 +1,4 @@
-using NightEmber.Models;
+using NightEmber.Core.Models;
 using NightEmber.TrayIcon;
 using System.Globalization;
 

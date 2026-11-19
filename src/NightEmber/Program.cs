@@ -1,4 +1,4 @@
-using NightEmber.Services;
+using NightEmber.Core.Services;
 using System.Runtime.CompilerServices;
 
 namespace NightEmber;

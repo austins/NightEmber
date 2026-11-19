@@ -1,5 +1,4 @@
 using H.NotifyIcon.Core;
-using NightEmber.Interop;
 using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -20,12 +19,12 @@ internal static class TrayIconPosition
     /// <returns>The popup anchor, falling back to the notification area if the icon cannot be located.</returns>
     public static Point GetMenuPosition(Guid id)
     {
-        var identifier = new NativeMethods.NotifyIconIdentifier
+        var identifier = new TrayNativeMethods.NotifyIconIdentifier
         {
-            Size = (uint)Marshal.SizeOf<NativeMethods.NotifyIconIdentifier>(),
+            Size = (uint)Marshal.SizeOf<TrayNativeMethods.NotifyIconIdentifier>(),
             Id = id
         };
-        var result = NativeMethods.ShellNotifyIconGetRect(in identifier, out var rectangle);
+        var result = TrayNativeMethods.ShellNotifyIconGetRect(in identifier, out var rectangle);
         if (result < 0)
         {
             Trace.TraceWarning(

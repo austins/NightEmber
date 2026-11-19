@@ -1,4 +1,5 @@
-using NightEmber.Models;
+using NightEmber.Core.Models;
+using NightEmber.Core.Services;
 using System.Diagnostics;
 using System.Windows.Threading;
 

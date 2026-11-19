@@ -1,8 +1,9 @@
 using Microsoft.Win32;
-using NightEmber.Display;
-using NightEmber.Models;
+using NightEmber.Core.Display;
+using NightEmber.Core.Models;
+using NightEmber.Core.Services;
 using NightEmber.Services;
-using NightEmber.Tests.Unit.Display;
+using NightEmber.Tests.Shared;
 
 namespace NightEmber.Tests.Unit.Services;
 
@@ -637,7 +638,7 @@ public sealed class AppControllerTests
         // Arrange
         var events = new List<string>();
         var runtime = new FakeRuntime(events);
-        var devices = new GammaServiceTests.FakeDevices();
+        var devices = new FakeDevices();
         using var controller = new AppController(
             () => new GammaService(devices),
             runtime,
@@ -684,7 +685,7 @@ public sealed class AppControllerTests
         // Arrange
         var events = new List<string>();
         var runtime = new FakeRuntime(events);
-        var devices = new GammaServiceTests.FakeDevices();
+        var devices = new FakeDevices();
         using var controller = new AppController(
             () => new GammaService(devices),
             runtime,

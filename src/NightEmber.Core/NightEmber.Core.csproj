@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>NightEmber.Core</RootNamespace>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <!-- Embeds symbols in the single-file exe like the app's profile does; that profile doesn't apply to this project. -->
+        <DebugType>embedded</DebugType>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="$(AssemblyName).Tests.Unit"/>
+        <InternalsVisibleTo Include="NightEmber.Tests.Unit"/>
+    </ItemGroup>
+</Project>

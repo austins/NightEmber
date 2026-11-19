@@ -1,3 +1,4 @@
+using NightEmber.Core.Services;
 using NightEmber.Services;
 using System.Windows;
 

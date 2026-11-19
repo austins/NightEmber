@@ -1,4 +1,3 @@
-using NightEmber.Interop;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
@@ -47,7 +46,7 @@ internal static class TrayIconFactory
         }
         finally
         {
-            NativeMethods.DestroyIcon(nativeIcon);
+            TrayNativeMethods.DestroyIcon(nativeIcon);
         }
     }
 }

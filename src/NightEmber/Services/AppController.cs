@@ -1,7 +1,8 @@
 using Microsoft.Win32;
-using NightEmber.Display;
-using NightEmber.Models;
-using NightEmber.Scheduling;
+using NightEmber.Core.Display;
+using NightEmber.Core.Models;
+using NightEmber.Core.Scheduling;
+using NightEmber.Core.Services;
 using NightEmber.TrayIcon;
 using System.ComponentModel;
 using System.Diagnostics;

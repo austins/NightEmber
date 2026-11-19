@@ -17,7 +17,7 @@ jobs:
                     persist-credentials: false
             -   uses: ./.github/actions/setup-dotnet-environment
             -   name: Restore dependencies
-                run: dotnet restore ./tests/NightEmber.Tests.Unit
+                run: dotnet restore
             -   name: Test
                 run: dotnet test --no-restore -c Release --results-directory ./test-results -- --report-xunit-ctrf
             -   if: always()

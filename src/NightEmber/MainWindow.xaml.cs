@@ -1,5 +1,5 @@
 using NightEmber.Controls;
-using NightEmber.Models;
+using NightEmber.Core.Models;
 using NightEmber.Services;
 using System.Globalization;
 using System.IO;
