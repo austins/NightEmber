@@ -8,8 +8,6 @@ namespace NightEmber.Core.Services;
 /// </summary>
 public sealed class SettingsService
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
-
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingsService" /> class.
     /// </summary>
@@ -52,7 +50,7 @@ public sealed class SettingsService
         try
         {
             var json = File.ReadAllText(ConfigPath);
-            var settings = JsonSerializer.Deserialize<AppSettings>(json, SerializerOptions);
+            var settings = JsonSerializer.Deserialize(json, SettingsJsonContext.Default.AppSettings);
             if (settings is null)
             {
                 return new SettingsLoadResult(
@@ -97,7 +95,7 @@ public sealed class SettingsService
     public void Save(AppSettings settings)
     {
         var normalized = settings.Normalize();
-        var json = JsonSerializer.Serialize(normalized, SerializerOptions);
+        var json = JsonSerializer.Serialize(normalized, SettingsJsonContext.Default.AppSettings);
         var temporaryPath = ConfigPath + $".{Environment.ProcessId}.tmp";
 
         try

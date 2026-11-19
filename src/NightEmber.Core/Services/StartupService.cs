@@ -1,3 +1,4 @@
+using NightEmber.Core.Interop;
 using System.Runtime.InteropServices;
 
 namespace NightEmber.Core.Services;
@@ -10,8 +11,11 @@ public sealed class StartupService
     private const string ShortcutName = "Night Ember.lnk";
     private const string HiddenArgument = "--hidden";
 
-    // WScript.Shell's WshWindowStyle value for an active, minimized window.
+    // SW_SHOWMINNOACTIVE: minimized without activation (same value as WshWindowStyle 7).
     private const int MinimizedWindowStyle = 7;
+    private const uint StgmRead = 0;
+    private const int PathBufferLength = 520;
+    private const int ArgumentsBufferLength = 1024;
 
     private readonly string _shortcutPath;
     private readonly string? _executablePath;
@@ -74,38 +78,6 @@ public sealed class StartupService
         }
     }
 
-    private static T UseShortcut<T>(string shortcutPath, Func<dynamic, T> action)
-    {
-        var shellType = Type.GetTypeFromProgID("WScript.Shell", true)
-                        ?? throw new InvalidOperationException("Windows Script Host is unavailable.");
-
-        var shell = Activator.CreateInstance(shellType)
-                    ?? throw new InvalidOperationException("Windows Script Host could not be started.");
-
-        object? shortcut = null;
-
-        try
-        {
-            // Dynamic avoids adding an IWshRuntimeLibrary interop dependency solely
-            // to manage this startup shortcut through WScript.Shell.
-            dynamic dynamicShell = shell;
-            shortcut = dynamicShell.CreateShortcut(shortcutPath);
-            return action(shortcut);
-        }
-        finally
-        {
-            if (shortcut is not null && Marshal.IsComObject(shortcut))
-            {
-                Marshal.FinalReleaseComObject(shortcut);
-            }
-
-            if (Marshal.IsComObject(shell))
-            {
-                Marshal.FinalReleaseComObject(shell);
-            }
-        }
-    }
-
     private static bool PathsEqual(string first, string second)
     {
         return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
@@ -122,9 +94,21 @@ public sealed class StartupService
         string arguments;
         try
         {
-            (target, arguments) = UseShortcut(
-                _shortcutPath,
-                static shortcut => ((string)shortcut.TargetPath, (string)shortcut.Arguments));
+            var link = ShellLinkInterop.CreateShellLink();
+            try
+            {
+                ((IPersistFile)link).Load(_shortcutPath, StgmRead);
+                Span<char> targetBuffer = stackalloc char[PathBufferLength];
+                Span<char> argumentsBuffer = stackalloc char[ArgumentsBufferLength];
+                link.GetPath(ref MemoryMarshal.GetReference(targetBuffer), targetBuffer.Length, 0, 0);
+                link.GetArguments(ref MemoryMarshal.GetReference(argumentsBuffer), argumentsBuffer.Length);
+                target = ToString(targetBuffer);
+                arguments = ToString(argumentsBuffer);
+            }
+            finally
+            {
+                ShellLinkInterop.Release(link);
+            }
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException or IOException
                                        or UnauthorizedAccessException)
@@ -154,17 +138,25 @@ public sealed class StartupService
                              ?? throw new InvalidOperationException("The executable path is unavailable.");
         var workingDirectory = Path.GetDirectoryName(executablePath) ?? AppContext.BaseDirectory;
 
-        UseShortcut(
-            _shortcutPath,
-            shortcut =>
-            {
-                shortcut.TargetPath = executablePath;
-                shortcut.Arguments = HiddenArgument;
-                shortcut.WorkingDirectory = workingDirectory;
-                shortcut.Description = "Night Ember";
-                shortcut.WindowStyle = MinimizedWindowStyle;
-                shortcut.Save();
-                return true;
-            });
+        var link = ShellLinkInterop.CreateShellLink();
+        try
+        {
+            link.SetPath(executablePath);
+            link.SetArguments(HiddenArgument);
+            link.SetWorkingDirectory(workingDirectory);
+            link.SetDescription("Night Ember");
+            link.SetShowCmd(MinimizedWindowStyle);
+            ((IPersistFile)link).Save(_shortcutPath, true);
+        }
+        finally
+        {
+            ShellLinkInterop.Release(link);
+        }
+    }
+
+    private static string ToString(ReadOnlySpan<char> buffer)
+    {
+        var end = buffer.IndexOf('\0');
+        return (end < 0 ? buffer : buffer[..end]).ToString();
     }
 }

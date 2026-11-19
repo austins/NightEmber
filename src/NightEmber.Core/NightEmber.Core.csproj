@@ -2,6 +2,7 @@
     <PropertyGroup>
         <RootNamespace>NightEmber.Core</RootNamespace>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <IsTrimmable>true</IsTrimmable>
         <!-- Embeds symbols in the single-file exe like the app's profile does; that profile doesn't apply to this project. -->
         <DebugType>embedded</DebugType>
     </PropertyGroup>
