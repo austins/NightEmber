@@ -11,12 +11,11 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
         <StartupObject>NightEmber.Program</StartupObject>
-        <!-- MainWindow takes its controller in the constructor; XAML is always compiled, never runtime-loaded. -->
-        <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Avalonia" Version="12.1.6"/>
+        <PackageReference Include="Avalonia.HarfBuzz" Version="12.1.6"/>
         <PackageReference Include="Avalonia.Skia" Version="12.1.6"/>
         <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6"/>
         <PackageReference Include="Avalonia.Win32" Version="12.1.6"/>

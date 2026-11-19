@@ -28,6 +28,15 @@ public sealed partial class MainWindow : Window
     private bool _previewPending;
 
     /// <summary>
+    /// Initializes the window for the XAML previewer only; the app always passes a controller.
+    /// </summary>
+    public MainWindow()
+    {
+        _controller = null!;
+        InitializeComponent();
+    }
+
+    /// <summary>
     /// Initializes the settings window from the active application state.
     /// </summary>
     /// <param name="controller">The application controller that owns settings and previews.</param>
