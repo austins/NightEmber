@@ -1,12 +1,12 @@
+using Avalonia.Threading;
 using NightEmber.Core.Models;
 using NightEmber.Core.Services;
 using System.Diagnostics;
-using System.Windows.Threading;
 
 namespace NightEmber.Services;
 
 /// <summary>
-/// Connects the controller to the system clock, settings storage, startup registration, and WPF dispatcher.
+/// Connects the controller to the system clock, settings storage, startup registration, and Avalonia dispatcher.
 /// </summary>
 /// <param name="dispatcher">The dispatcher that owns controller callbacks and timers.</param>
 internal sealed class AppControllerRuntime(Dispatcher dispatcher) : IAppControllerRuntime
@@ -15,8 +15,6 @@ internal sealed class AppControllerRuntime(Dispatcher dispatcher) : IAppControll
     private readonly StartupService _startup = new();
 
     public DateTime Now => DateTime.Now;
-
-    public DateTime UtcNow => DateTime.UtcNow;
 
     public bool IsStartupEnabled => _startup.IsEnabled;
 
@@ -54,9 +52,7 @@ internal sealed class AppControllerRuntime(Dispatcher dispatcher) : IAppControll
 
     public void Post(Action action)
     {
-#pragma warning disable VSTHRD001, VSTHRD110 // WPF dispatcher scheduling is intentionally fire-and-forget.
-        dispatcher.BeginInvoke(action);
-#pragma warning restore VSTHRD001, VSTHRD110
+        dispatcher.Post(action, DispatcherPriority.Normal);
     }
 
     public bool CheckAccess()
@@ -66,9 +62,7 @@ internal sealed class AppControllerRuntime(Dispatcher dispatcher) : IAppControll
 
     public void Invoke(Action action)
     {
-#pragma warning disable VSTHRD001 // Session-ending cleanup must synchronously reach the WPF dispatcher.
         dispatcher.Invoke(action);
-#pragma warning restore VSTHRD001
     }
 
     public void RefreshTimeZone()
@@ -99,11 +93,6 @@ internal interface IAppControllerRuntime
     /// Gets the current local date and time for schedule evaluation.
     /// </summary>
     public DateTime Now { get; }
-
-    /// <summary>
-    /// Gets the current UTC date and time for notification throttling.
-    /// </summary>
-    public DateTime UtcNow { get; }
 
     /// <summary>
     /// Gets a value indicating whether launch at sign-in is enabled.

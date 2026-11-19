@@ -1,6 +1,10 @@
+using Avalonia;
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using System.Globalization;
-using System.Windows;
-using System.Windows.Input;
 
 namespace NightEmber.Controls;
 
@@ -10,32 +14,38 @@ namespace NightEmber.Controls;
 /// <remarks>
 /// The text uses the current Windows short-time pattern. Users can type a full
 /// time or select the hour, minute, or day-period segment and adjust it with the
-/// spinner buttons, arrow keys, or mouse wheel.
+/// spinner buttons, arrow keys, or mouse wheel. Avalonia's <see cref="TimePicker" /> is flyout-only and has
+/// no typed entry or segment selection, so this composes the built-in <see cref="ButtonSpinner" /> and
+/// <see cref="DataValidationErrors" /> around a <see cref="TextBox" /> instead.
 /// </remarks>
-public sealed partial class TimeUpDown
+public sealed partial class TimeUpDown : UserControl
 {
     /// <summary>
-    /// Identifies the <see cref="MinuteIncrement" /> dependency property.
+    /// Identifies the <see cref="MinuteIncrement" /> styled property.
     /// </summary>
-    public static readonly DependencyProperty MinuteIncrementProperty = DependencyProperty.Register(
-        nameof(MinuteIncrement),
-        typeof(int),
-        typeof(TimeUpDown),
-        new FrameworkPropertyMetadata(5, null, CoerceMinuteIncrement));
+    public static readonly StyledProperty<int> MinuteIncrementProperty =
+        AvaloniaProperty.Register<TimeUpDown, int>(
+            nameof(MinuteIncrement),
+            5,
+            coerce: static (_, value) => Math.Clamp(value, 1, 59));
 
     /// <summary>
-    /// Identifies the <see cref="TimeValue" /> dependency property.
+    /// Identifies the <see cref="TimeValue" /> styled property.
     /// </summary>
-    public static readonly DependencyProperty TimeValueProperty = DependencyProperty.Register(
-        nameof(TimeValue),
-        typeof(TimeSpan),
-        typeof(TimeUpDown),
-        new FrameworkPropertyMetadata(
+    public static readonly StyledProperty<TimeSpan> TimeValueProperty =
+        AvaloniaProperty.Register<TimeUpDown, TimeSpan>(
+            nameof(TimeValue),
             TimeSpan.Zero,
-            FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
-            OnTimeValueChanged,
-            CoerceTimeValue));
+            defaultBindingMode: BindingMode.TwoWay,
+            coerce: static (_, value) => CoerceTimeValue(value));
 
+    /// <summary>
+    /// Identifies the <see cref="ErrorMessage" /> styled property.
+    /// </summary>
+    public static readonly StyledProperty<string> ErrorMessageProperty =
+        AvaloniaProperty.Register<TimeUpDown, string>(nameof(ErrorMessage), string.Empty);
+
+    private readonly bool _ready;
     private TimeSegment _selectedSegment = TimeSegment.Hour;
     private IReadOnlyList<SegmentRange> _segments = [];
     private bool _updatingText;
@@ -48,6 +58,16 @@ public sealed partial class TimeUpDown
     public TimeUpDown()
     {
         InitializeComponent();
+        ValueTextBox.AddHandler(KeyDownEvent, ValueTextBox_KeyDown, RoutingStrategies.Tunnel);
+        ValueTextBox.AddHandler(
+            PointerReleasedEvent,
+            ValueTextBox_PointerReleased,
+            RoutingStrategies.Bubble,
+            handledEventsToo: true);
+        ValueTextBox.TextChanged += ValueTextBox_TextChanged;
+        ValueTextBox.GotFocus += ValueTextBox_GotFocus;
+        ValueTextBox.LostFocus += ValueTextBox_LostFocus;
+        _ready = true;
         UpdateText();
     }
 
@@ -56,7 +76,7 @@ public sealed partial class TimeUpDown
     /// </summary>
     public int MinuteIncrement
     {
-        get => (int)GetValue(MinuteIncrementProperty);
+        get => GetValue(MinuteIncrementProperty);
         set => SetValue(MinuteIncrementProperty, value);
     }
 
@@ -65,8 +85,17 @@ public sealed partial class TimeUpDown
     /// </summary>
     public TimeSpan TimeValue
     {
-        get => (TimeSpan)GetValue(TimeValueProperty);
+        get => GetValue(TimeValueProperty);
         set => SetValue(TimeValueProperty, value);
+    }
+
+    /// <summary>
+    /// Gets the message explaining the current edit's validation error, or an empty string when valid.
+    /// </summary>
+    public string ErrorMessage
+    {
+        get => GetValue(ErrorMessageProperty);
+        private set => SetValue(ErrorMessageProperty, value);
     }
 
     /// <summary>
@@ -90,34 +119,57 @@ public sealed partial class TimeUpDown
     internal bool TryGetEditedTime(out TimeSpan time)
     {
         var culture = CultureInfo.CurrentCulture;
+        var text = ValueTextBox.Text;
         var valid = TimeOnly.TryParseExact(
-                        ValueTextBox.Text,
+                        text,
                         culture.DateTimeFormat.ShortTimePattern,
                         culture,
                         DateTimeStyles.AllowWhiteSpaces,
                         out var parsed)
-                    || TimeOnly.TryParse(ValueTextBox.Text, culture, DateTimeStyles.AllowWhiteSpaces, out parsed);
+                    || TimeOnly.TryParse(text, culture, DateTimeStyles.AllowWhiteSpaces, out parsed);
         time = parsed.ToTimeSpan();
         return valid;
     }
 
-    protected override void OnAccessKey(AccessKeyEventArgs e)
+    internal void FocusEditor()
     {
         ValueTextBox.Focus();
-        if (!_isTextDirty)
+        ValueTextBox.BringIntoView();
+    }
+
+    /// <inheritdoc />
+    protected override void OnGotFocus(FocusChangedEventArgs e)
+    {
+        base.OnGotFocus(e);
+
+        // The label's access key focuses this wrapper; the editor inside owns keyboard input.
+        if (ReferenceEquals(e.Source, this))
         {
-            SelectSegment(_selectedSegment);
+            ValueTextBox.Focus();
         }
     }
 
-    private static object CoerceMinuteIncrement(DependencyObject element, object value)
+    /// <inheritdoc />
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
-        return Math.Clamp((int)value, 1, 59);
+        base.OnPropertyChanged(change);
+        if (!_ready)
+        {
+            return;
+        }
+
+        if (change.Property == TimeValueProperty)
+        {
+            UpdateText();
+        }
+        else
+        {
+            EditorAutomation.Forward(change, ValueTextBox);
+        }
     }
 
-    private static object CoerceTimeValue(DependencyObject element, object value)
+    private static TimeSpan CoerceTimeValue(TimeSpan time)
     {
-        var time = (TimeSpan)value;
         var ticks = time.Ticks % TimeSpan.TicksPerDay;
         if (ticks < 0)
         {
@@ -127,9 +179,50 @@ public sealed partial class TimeUpDown
         return TimeSpan.FromTicks(ticks);
     }
 
-    private static void OnTimeValueChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    private static List<SegmentRange> FindSegments(
+        DateTime date,
+        string pattern,
+        string formatted,
+        CultureInfo culture)
     {
-        ((TimeUpDown)element).UpdateText();
+        var segments = new List<SegmentRange>(3);
+        var hourToken = TimeFormat.FindToken(pattern, 'H', 'h');
+        var minuteToken = TimeFormat.FindToken(pattern, 'm');
+        var searchIndex = 0;
+
+        if (hourToken is not null)
+        {
+            var hourText = TimeFormat.FormatToken(date, hourToken, culture);
+            var start = formatted.IndexOf(hourText, searchIndex, StringComparison.CurrentCulture);
+            if (start >= 0)
+            {
+                segments.Add(new SegmentRange(TimeSegment.Hour, start, hourText.Length));
+                searchIndex = start + hourText.Length;
+            }
+        }
+
+        if (minuteToken is not null)
+        {
+            var minuteText = TimeFormat.FormatToken(date, minuteToken, culture);
+            var start = formatted.IndexOf(minuteText, searchIndex, StringComparison.CurrentCulture);
+            if (start >= 0)
+            {
+                segments.Add(new SegmentRange(TimeSegment.Minute, start, minuteText.Length));
+            }
+        }
+
+        var periodToken = TimeFormat.FindToken(pattern, 't');
+        var periodText = periodToken is null ? string.Empty : TimeFormat.FormatToken(date, periodToken, culture);
+        if (!string.IsNullOrEmpty(periodText))
+        {
+            var start = formatted.IndexOf(periodText, StringComparison.CurrentCulture);
+            if (start >= 0)
+            {
+                segments.Add(new SegmentRange(TimeSegment.Period, start, periodText.Length));
+            }
+        }
+
+        return segments;
     }
 
     private void ChangeValue(int direction)
@@ -196,15 +289,16 @@ public sealed partial class TimeUpDown
         }
 
         _selectedSegment = segment;
-        ValueTextBox.Select(range.Start, range.Length);
-        UpdateSegmentAccessibility();
+        ValueTextBox.SelectionStart = range.Start;
+        ValueTextBox.SelectionEnd = range.Start + range.Length;
+        UpdateStatus();
     }
 
-    private void UpdateSegmentAccessibility()
+    private void UpdateStatus()
     {
-        InputValidation.UpdateStatus(
+        AutomationProperties.SetItemStatus(
             ValueTextBox,
-            InputValidation.GetHasError(this) ? InputValidation.GetErrorMessage(this) : SelectedSegmentStatus());
+            ErrorMessage.Length > 0 ? ErrorMessage : SelectedSegmentStatus());
     }
 
     private string SelectedSegmentStatus()
@@ -225,31 +319,20 @@ public sealed partial class TimeUpDown
             .Today
             .AddHours(21)
             .ToString(CultureInfo.CurrentCulture.DateTimeFormat.ShortTimePattern, CultureInfo.CurrentCulture);
-        InputValidation.SetError(
-            this,
-            ValueTextBox,
-            valid ? string.Empty : $"Enter a valid time, for example {example}.",
-            SelectedSegmentStatus());
+        SetError(valid ? string.Empty : $"Enter a valid time, for example {example}.");
         return valid;
     }
 
-    private void ValueTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    private void SetError(string message)
     {
-        if (_updatingText)
-        {
-            return;
-        }
-
-        _isTextDirty = true;
-        if (_validateEdits)
-        {
-            ValidateEdit(out _);
-        }
+        ErrorMessage = message;
+        DataValidationErrors.SetErrors(Spinner, message.Length > 0 ? [message] : null);
+        UpdateStatus();
     }
 
     private void UpdateText()
     {
-        if (_updatingText || ValueTextBox is null)
+        if (_updatingText)
         {
             return;
         }
@@ -264,78 +347,44 @@ public sealed partial class TimeUpDown
         _updatingText = false;
         _isTextDirty = false;
         _validateEdits = false;
-        InputValidation.SetError(this, ValueTextBox, string.Empty, SelectedSegmentStatus());
+        SetError(string.Empty);
     }
 
-    private static IReadOnlyList<SegmentRange> FindSegments(
-        DateTime date,
-        string pattern,
-        string formatted,
-        CultureInfo culture)
+    private void ValueTextBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
-        var segments = new List<SegmentRange>(3);
-        var hourToken = TimeFormat.FindToken(pattern, 'H', 'h');
-        var minuteToken = TimeFormat.FindToken(pattern, 'm');
-        var searchIndex = 0;
-
-        if (hourToken is not null)
+        if (_updatingText)
         {
-            var hourText = TimeFormat.FormatToken(date, hourToken, culture);
-            var start = formatted.IndexOf(hourText, searchIndex, StringComparison.CurrentCulture);
-            if (start >= 0)
-            {
-                segments.Add(new SegmentRange(TimeSegment.Hour, start, hourText.Length));
-                searchIndex = start + hourText.Length;
-            }
+            return;
         }
 
-        if (minuteToken is not null)
+        _isTextDirty = true;
+        if (_validateEdits)
         {
-            var minuteText = TimeFormat.FormatToken(date, minuteToken, culture);
-            var start = formatted.IndexOf(minuteText, searchIndex, StringComparison.CurrentCulture);
-            if (start >= 0)
-            {
-                segments.Add(new SegmentRange(TimeSegment.Minute, start, minuteText.Length));
-            }
+            ValidateEdit(out _);
         }
+    }
 
-        var periodToken = TimeFormat.FindToken(pattern, 't');
-        var periodText = periodToken is null ? string.Empty : TimeFormat.FormatToken(date, periodToken, culture);
-        if (!string.IsNullOrEmpty(periodText))
+    private void Spinner_Spin(object? sender, SpinEventArgs e)
+    {
+        ChangeValue(e.Direction == SpinDirection.Increase ? 1 : -1);
+    }
+
+    private void ValueTextBox_GotFocus(object? sender, FocusChangedEventArgs e)
+    {
+        if (!_isTextDirty)
         {
-            var start = formatted.IndexOf(periodText, StringComparison.CurrentCulture);
-            if (start >= 0)
-            {
-                segments.Add(new SegmentRange(TimeSegment.Period, start, periodText.Length));
-            }
+            SelectSegment(_selectedSegment);
         }
-
-        return segments;
     }
 
-    private void IncreaseButton_Click(object sender, RoutedEventArgs e)
-    {
-        ChangeValue(1);
-    }
-
-    private void DecreaseButton_Click(object sender, RoutedEventArgs e)
-    {
-        ChangeValue(-1);
-    }
-
-    private void ValueTextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    private void ValueTextBox_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         SelectSegmentAt(ValueTextBox.CaretIndex);
     }
 
-    private void ValueTextBox_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void ValueTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        SelectSegmentAt(ValueTextBox.CaretIndex);
-    }
-
-    private void ValueTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.KeyboardDevice.Modifiers != ModifierKeys.None)
+        if (e.KeyModifiers != KeyModifiers.None)
         {
             return;
         }
@@ -374,20 +423,9 @@ public sealed partial class TimeUpDown
         }
     }
 
-    private void ValueTextBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    private void ValueTextBox_LostFocus(object? sender, RoutedEventArgs e)
     {
         CommitEdit();
-    }
-
-    private void TimeUpDown_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
-    {
-        if (!IsKeyboardFocusWithin)
-        {
-            return;
-        }
-
-        ChangeValue(e.Delta > 0 ? 1 : -1);
-        e.Handled = true;
     }
 
     private enum TimeSegment

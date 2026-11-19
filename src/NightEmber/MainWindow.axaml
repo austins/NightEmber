@@ -1,0 +1,238 @@
+<Window x:Class="NightEmber.MainWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:NightEmber.Controls"
+        Title="Night Ember"
+        Width="500"
+        Height="780"
+        MinWidth="460"
+        MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        CanResize="True"
+        Icon="/Resources/AppIcon.ico"
+        KeyboardNavigation.TabNavigation="Cycle">
+    <Window.Styles>
+        <Style Selector="TextBlock.secondary">
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.inputError">
+            <Setter Property="Foreground" Value="{DynamicResource InputErrorBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+    </Window.Styles>
+    <Grid RowDefinitions="*,Auto,Auto">
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      Focusable="False"
+                      IsTabStop="False">
+            <Grid Margin="28,22,28,16" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,22">
+                    <Viewbox Width="44"
+                             Height="44"
+                             Margin="0,0,14,0"
+                             Focusable="False"
+                             IsHitTestVisible="False">
+                        <Path Fill="#FFFFA83C">
+                            <Path.Data>
+                                <CombinedGeometry GeometryCombineMode="Exclude">
+                                    <CombinedGeometry.Geometry1>
+                                        <EllipseGeometry Rect="3,3,26,26" />
+                                    </CombinedGeometry.Geometry1>
+                                    <CombinedGeometry.Geometry2>
+                                        <EllipseGeometry Rect="9,-2,26,26" />
+                                    </CombinedGeometry.Geometry2>
+                                </CombinedGeometry>
+                            </Path.Data>
+                        </Path>
+                    </Viewbox>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Night Ember" FontSize="24" FontWeight="SemiBold" />
+                        <TextBlock Text="Warm, comfortable light after dark"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,0,0,18">
+                    <DockPanel>
+                        <TextBlock x:Name="StrengthValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
+                        <Label x:Name="StrengthLabel"
+                               Content="Stren_gth"
+                               Target="{Binding #StrengthSlider}"
+                               Padding="0"
+                               FontWeight="SemiBold" />
+                    </DockPanel>
+                    <TextBlock Classes="secondary"
+                               Text="Controls how warm the display looks. Higher values reduce more blue light."
+                               Margin="0,3,0,0" />
+                    <Slider x:Name="StrengthSlider"
+                            Minimum="0"
+                            Maximum="100"
+                            TickFrequency="10"
+                            IsSnapToTickEnabled="False"
+                            ValueChanged="PreviewSlider_ValueChanged"
+                            AutomationProperties.LabeledBy="{Binding #StrengthLabel}"
+                            AutomationProperties.AcceleratorKey="Alt+G"
+                            AutomationProperties.HelpText="Controls how warm the display looks. Higher values reduce more blue light."
+                            Margin="0,8,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Margin="0,0,0,20">
+                    <DockPanel>
+                        <TextBlock x:Name="BrightnessValueText" DockPanel.Dock="Right" HorizontalAlignment="Right" />
+                        <Label x:Name="BrightnessLabel"
+                               Content="_Brightness"
+                               Target="{Binding #BrightnessSlider}"
+                               Padding="0"
+                               FontWeight="SemiBold" />
+                    </DockPanel>
+                    <TextBlock Classes="secondary"
+                               Text="Darkens the image in software without changing the monitor's backlight."
+                               Margin="0,3,0,0" />
+                    <Slider x:Name="BrightnessSlider"
+                            Minimum="50"
+                            Maximum="100"
+                            TickFrequency="10"
+                            IsSnapToTickEnabled="False"
+                            ValueChanged="PreviewSlider_ValueChanged"
+                            AutomationProperties.LabeledBy="{Binding #BrightnessLabel}"
+                            AutomationProperties.AcceleratorKey="Alt+B"
+                            AutomationProperties.HelpText="Darkens the image in software without changing the monitor's backlight."
+                            Margin="0,8,0,0" />
+                </StackPanel>
+
+                <HeaderedContentControl Grid.Row="3" Margin="0,0,0,18">
+                    <HeaderedContentControl.Header>
+                        <TextBlock Text="Schedule" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    </HeaderedContentControl.Header>
+                    <StackPanel>
+                        <StackPanel x:Name="ScheduleOptions">
+                            <RadioButton x:Name="ManualModeRadio"
+                                         Content="_Never (manual only)"
+                                         GroupName="Schedule"
+                                         IsCheckedChanged="ScheduleMode_CheckedChanged"
+                                         Margin="0,0,0,4" />
+                            <RadioButton x:Name="SunsetModeRadio"
+                                         Content="S_unset to sunrise"
+                                         GroupName="Schedule"
+                                         IsCheckedChanged="ScheduleMode_CheckedChanged"
+                                         Margin="0,0,0,4" />
+                            <TextBlock x:Name="SunInfoText"
+                                       Classes="secondary"
+                                       FontSize="14"
+                                       Margin="22,0,0,12" />
+                            <RadioButton x:Name="CustomModeRadio"
+                                         Content="Set _hours"
+                                         GroupName="Schedule"
+                                         IsCheckedChanged="ScheduleMode_CheckedChanged"
+                                         Margin="0,0,0,8" />
+                        </StackPanel>
+                        <Grid x:Name="CustomTimePanel"
+                              Margin="22,0,0,0"
+                              RowDefinitions="Auto,Auto"
+                              ColumnDefinitions="Auto,110,22,Auto,110">
+                            <Label x:Name="CustomOnLabel"
+                                   Grid.Column="0"
+                                   Content="Turn _on"
+                                   Target="{Binding #CustomOnInput}"
+                                   Padding="0"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0" />
+                            <controls:TimeUpDown x:Name="CustomOnInput"
+                                                 Grid.Column="1"
+                                                 MinuteIncrement="5"
+                                                 AutomationProperties.LabeledBy="{Binding #CustomOnLabel}"
+                                                 AutomationProperties.AcceleratorKey="Alt+O"
+                                                 AutomationProperties.HelpText="Turn-on time. Type a time or use Left and Right to select hours, minutes, or AM/PM, then Up and Down to adjust. Enter commits the edit; Escape restores it." />
+                            <Label x:Name="CustomOffLabel"
+                                   Grid.Column="3"
+                                   Content="Turn o_ff"
+                                   Target="{Binding #CustomOffInput}"
+                                   Padding="0"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0" />
+                            <controls:TimeUpDown x:Name="CustomOffInput"
+                                                 Grid.Column="4"
+                                                 MinuteIncrement="5"
+                                                 AutomationProperties.LabeledBy="{Binding #CustomOffLabel}"
+                                                 AutomationProperties.AcceleratorKey="Alt+F"
+                                                 AutomationProperties.HelpText="Turn-off time. Type a time or use Left and Right to select hours, minutes, or AM/PM, then Up and Down to adjust. Enter commits the edit; Escape restores it." />
+                            <StackPanel x:Name="ScheduleErrors" Grid.Row="1" Grid.ColumnSpan="5">
+                                <TextBlock x:Name="CustomOnErrorText"
+                                           Classes="inputError"
+                                           Text="{Binding ErrorMessage, ElementName=CustomOnInput, StringFormat='Turn on: {0}'}"
+                                           IsVisible="{Binding ErrorMessage, ElementName=CustomOnInput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBlock x:Name="CustomOffErrorText"
+                                           Classes="inputError"
+                                           Text="{Binding ErrorMessage, ElementName=CustomOffInput, StringFormat='Turn off: {0}'}"
+                                           IsVisible="{Binding ErrorMessage, ElementName=CustomOffInput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBlock x:Name="ScheduleErrorText"
+                                           Classes="inputError"
+                                           AutomationProperties.LiveSetting="Assertive" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </HeaderedContentControl>
+
+                <Grid Grid.Row="4" RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,110">
+                    <Label x:Name="FadeDurationLabel"
+                           Content="_Transition duration (0 to 5000 ms)"
+                           Target="{Binding #FadeDurationInput}"
+                           Padding="0"
+                           VerticalAlignment="Center" />
+                    <controls:NumericUpDown x:Name="FadeDurationInput"
+                                            Grid.Row="0"
+                                            Grid.Column="1"
+                                            Minimum="0"
+                                            Maximum="5000"
+                                            Increment="50"
+                                            AutomationProperties.LabeledBy="{Binding #FadeDurationLabel}"
+                                            AutomationProperties.AcceleratorKey="Alt+T"
+                                            AutomationProperties.HelpText="Transition duration, from 0 to 5000 milliseconds. Type a value or use Up and Down to adjust by 50 milliseconds. Enter commits the edit; Escape restores it."
+                                            VerticalAlignment="Center" />
+                    <TextBlock x:Name="FadeDurationErrorText"
+                               Grid.Row="1"
+                               Grid.ColumnSpan="2"
+                               Classes="inputError"
+                               Text="{Binding ErrorMessage, ElementName=FadeDurationInput}"
+                               IsVisible="{Binding ErrorMessage, ElementName=FadeDurationInput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <CheckBox x:Name="StartupCheckBox"
+                              Grid.Row="2"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="2"
+                              Content="Start _automatically when I sign in"
+                              Margin="0,16,0,0" />
+                </Grid>
+            </Grid>
+        </ScrollViewer>
+
+        <TextBlock x:Name="GammaErrorText"
+                   Grid.Row="1"
+                   Classes="inputError"
+                   Margin="28,0,28,0"
+                   IsVisible="False"
+                   AutomationProperties.LiveSetting="Assertive" />
+
+        <Grid Grid.Row="2" Margin="28,12,28,24" ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0"
+                       Classes="secondary"
+                       Text="Warmth and brightness preview immediately. Save to keep your changes."
+                       VerticalAlignment="Center"
+                       Margin="0,0,16,0" />
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center">
+                <Button Content="_Cancel" IsCancel="True" Click="CancelButton_Click" Margin="0,0,10,0" />
+                <Button x:Name="SaveButton"
+                        Content="_Save"
+                        IsDefault="True"
+                        Click="SaveButton_Click"
+                        Classes="accent" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

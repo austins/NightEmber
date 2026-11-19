@@ -51,4 +51,24 @@ public sealed class TrayTooltipTests
         // Assert
         result.Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData(null, "Night Ember on - 3400K\nManual")]
+    [InlineData("", "Night Ember on - 3400K\nManual")]
+    [InlineData("Display error", "Night Ember on - 3400K\nManual\nDisplay error")]
+    public void Format_GammaError_AppendsErrorLineWhenPresent(string? gammaError, string expected)
+    {
+        // Act
+        var result = TrayTooltip.Format(
+            true,
+            3400,
+            true,
+            ScheduleMode.Custom,
+            null,
+            CultureInfo.InvariantCulture,
+            gammaError);
+
+        // Assert
+        result.Should().Be(expected);
+    }
 }

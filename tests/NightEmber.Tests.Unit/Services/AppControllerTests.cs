@@ -755,6 +755,58 @@ public sealed class AppControllerTests
     }
 
     [Fact]
+    public void GammaError_RejectedThenSuccessfulApply_IsSetThenCleared()
+    {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        var changes = 0;
+        fixture.Controller.GammaErrorChanged += (_, _) => changes++;
+        fixture.Gamma.ApplyResults.Enqueue(false);
+
+        // Act
+        fixture.Controller.Preview(4000, 80);
+        var afterRejection = fixture.Controller.GammaError;
+        fixture.Controller.Preview(4200, 80);
+
+        // Assert
+        afterRejection.Should().Be("The display driver rejected the requested gamma ramp.");
+        fixture.Controller.GammaError.Should().BeNull();
+        changes.Should().Be(2);
+    }
+
+    [Fact]
+    public void GammaError_SameRejectionAfterRecovery_IsShownAgain()
+    {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Gamma.ApplyResults.Enqueue(false);
+        fixture.Gamma.ApplyResults.Enqueue(true);
+        fixture.Gamma.ApplyResults.Enqueue(false);
+
+        // Act
+        fixture.Controller.Preview(4000, 80);
+        fixture.Controller.Preview(4200, 80);
+        fixture.Controller.Preview(4400, 80);
+
+        // Assert
+        fixture.Controller.GammaError.Should().Be("The display driver rejected the requested gamma ramp.");
+    }
+
+    [Fact]
+    public void GammaError_ApplyThrowsDisplayException_ExposesTheMessage()
+    {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Gamma.ApplyException = new System.ComponentModel.Win32Exception("Display unavailable");
+
+        // Act
+        fixture.Controller.Preview(4000, 80);
+
+        // Assert
+        fixture.Controller.GammaError.Should().Be("Display unavailable");
+    }
+
+    [Fact]
     public void ApplyGamma_RejectedDuringFade_StopsFade()
     {
         // Arrange
@@ -916,8 +968,6 @@ public sealed class AppControllerTests
     internal sealed class FakeRuntime(List<string> events) : IAppControllerRuntime
     {
         public DateTime Now { get; set; } = new(2026, 9, 4, 22, 0, 0, DateTimeKind.Local);
-
-        public DateTime UtcNow => Now;
 
         public bool IsStartupEnabled => false;
 

@@ -1,21 +1,18 @@
-using NightEmber.Controls;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using NightEmber.Core.Models;
 using NightEmber.Services;
 using System.Globalization;
-using System.IO;
-using System.Windows;
-using System.Windows.Automation.Peers;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
-using System.Windows.Threading;
 
 namespace NightEmber;
 
 /// <summary>
 /// Provides the settings window for configuring and previewing Night Ember.
 /// </summary>
-public sealed partial class MainWindow
+public sealed partial class MainWindow : Window
 {
     private const int MinimumStrength = 0;
     private const int MaximumStrength = 100;
@@ -28,7 +25,7 @@ public sealed partial class MainWindow
     private int _originalTemperature;
     private bool _saved;
     private bool _showScheduleValidation;
-    private DispatcherOperation? _pendingPreview;
+    private bool _previewPending;
 
     /// <summary>
     /// Initializes the settings window from the active application state.
@@ -39,10 +36,15 @@ public sealed partial class MainWindow
         _controller = controller;
         InitializeComponent();
         LoadSettings(controller.CurrentSettings);
-        Closing += MainWindow_Closing;
+        ScheduleOptions.AddHandler(KeyDownEvent, ScheduleOptions_KeyDown, RoutingStrategies.Tunnel);
+        CustomTimePanel.AddHandler(TextBox.TextChangedEvent, ScheduleTimes_TextChanged);
+        controller.GammaErrorChanged += Controller_GammaErrorChanged;
+        Opened += MainWindow_Opened;
+        Closed += MainWindow_Closed;
         _initialized = true;
         UpdatePreviewLabels();
         UpdateScheduleControls();
+        UpdateGammaError();
     }
 
     internal static int TemperatureToStrength(int temperature)
@@ -129,7 +131,12 @@ public sealed partial class MainWindow
             : "The sun does not rise or set here today.";
     }
 
-    private void PreviewSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void MainWindow_Opened(object? sender, EventArgs e)
+    {
+        StrengthSlider.Focus();
+    }
+
+    private void PreviewSlider_ValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
     {
         if (!_initialized)
         {
@@ -140,20 +147,27 @@ public sealed partial class MainWindow
 
         // Slider drags raise many value changes per frame; applying only the latest value once
         // input and rendering are processed avoids a gamma write for every intermediate step.
-#pragma warning disable VSTHRD001, VSTHRD110 // WPF owns this dispatcher; previews are intentionally fire-and-forget.
-        _pendingPreview ??= Dispatcher.BeginInvoke(DispatcherPriority.Background, ApplyPreview);
-#pragma warning restore VSTHRD001, VSTHRD110
+        if (!_previewPending)
+        {
+            _previewPending = true;
+            Dispatcher.UIThread.Post(ApplyPreview, DispatcherPriority.Background);
+        }
     }
 
     private void ApplyPreview()
     {
-        _pendingPreview = null;
+        if (!_previewPending)
+        {
+            return;
+        }
+
+        _previewPending = false;
         _controller.Preview(
             StrengthToTemperature((int)Math.Round(StrengthSlider.Value)),
             (int)Math.Round(BrightnessSlider.Value));
     }
 
-    private void ScheduleMode_Checked(object sender, RoutedEventArgs e)
+    private void ScheduleMode_CheckedChanged(object? sender, RoutedEventArgs e)
     {
         if (_initialized)
         {
@@ -161,9 +175,9 @@ public sealed partial class MainWindow
         }
     }
 
-    private void ScheduleOptions_PreviewKeyDown(object sender, KeyEventArgs e)
+    private void ScheduleOptions_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.KeyboardDevice.Modifiers != ModifierKeys.None || e.OriginalSource is not RadioButton current)
+        if (e.KeyModifiers != KeyModifiers.None || e.Source is not RadioButton current)
         {
             return;
         }
@@ -172,10 +186,10 @@ public sealed partial class MainWindow
         {
             Key.Up => -1,
             Key.Down => 1,
-            Key.Left => FlowDirection == FlowDirection.RightToLeft
+            Key.Left => FlowDirection == Avalonia.Media.FlowDirection.RightToLeft
                 ? 1
                 : -1,
-            Key.Right => FlowDirection == FlowDirection.RightToLeft
+            Key.Right => FlowDirection == Avalonia.Media.FlowDirection.RightToLeft
                 ? -1
                 : 1,
             _ => 0
@@ -189,12 +203,12 @@ public sealed partial class MainWindow
         RadioButton[] options = [ManualModeRadio, SunsetModeRadio, CustomModeRadio];
         var index = Array.IndexOf(options, current);
         var next = options[(index + direction + options.Length) % options.Length];
-        next.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+        next.IsChecked = true;
         next.Focus();
         e.Handled = true;
     }
 
-    private void SaveButton_Click(object sender, RoutedEventArgs e)
+    private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
         if (!ValidateInputs())
         {
@@ -221,34 +235,42 @@ public sealed partial class MainWindow
             Close();
             if (warning is not null)
             {
-                MessageBox.Show(warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.ShowWarning(warning);
             }
         }
         catch (Exception ex) when (ex is IOException
                                        or UnauthorizedAccessException
                                        or System.Security.SecurityException)
         {
-            MessageBox.Show(
-                $"The settings could not be saved.\n\n{ex.Message}",
-                "Night Ember",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            MessageBox.ShowError($"The settings could not be saved.\n\n{ex.Message}");
         }
     }
 
-    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    private void CancelButton_Click(object? sender, RoutedEventArgs e)
     {
         Close();
     }
 
-    private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    private void MainWindow_Closed(object? sender, EventArgs e)
     {
-        _pendingPreview?.Abort();
-        _pendingPreview = null;
+        _previewPending = false;
+        _controller.GammaErrorChanged -= Controller_GammaErrorChanged;
         if (!_saved)
         {
             _controller.CancelPreview();
         }
+    }
+
+    private void Controller_GammaErrorChanged(object? sender, EventArgs e)
+    {
+        UpdateGammaError();
+    }
+
+    private void UpdateGammaError()
+    {
+        var error = _controller.GammaError;
+        GammaErrorText.Text = error;
+        GammaErrorText.IsVisible = !string.IsNullOrEmpty(error);
     }
 
     private void UpdatePreviewLabels()
@@ -264,7 +286,12 @@ public sealed partial class MainWindow
 
     private void UpdateScheduleControls()
     {
+        // Only the selected option is a tab stop; arrow keys move between options.
+        ManualModeRadio.IsTabStop = ManualModeRadio.IsChecked == true;
+        SunsetModeRadio.IsTabStop = SunsetModeRadio.IsChecked == true;
+        CustomModeRadio.IsTabStop = CustomModeRadio.IsChecked == true;
         CustomTimePanel.IsEnabled = CustomModeRadio.IsChecked == true;
+        ScheduleErrors.IsVisible = CustomModeRadio.IsChecked == true;
         UpdateScheduleValidation();
     }
 
@@ -277,24 +304,27 @@ public sealed partial class MainWindow
         var durationValid = FadeDurationInput.CommitEdit();
         var scheduleValid = UpdateScheduleValidation();
 
-        var invalidInput = !onValid
-            ? CustomOnInput.ValueTextBox
-            : !offValid || !scheduleValid
-                ? CustomOffInput.ValueTextBox
-                : !durationValid
-                    ? FadeDurationInput.ValueTextBox
-                    : null;
-
-        if (invalidInput is null)
+        if (!onValid)
+        {
+            CustomOnInput.FocusEditor();
+        }
+        else if (!offValid || !scheduleValid)
+        {
+            CustomOffInput.FocusEditor();
+        }
+        else if (!durationValid)
+        {
+            FadeDurationInput.FocusEditor();
+        }
+        else
         {
             return true;
         }
 
-        InputValidation.FocusEditor(invalidInput);
         return false;
     }
 
-    private void ScheduleTimes_TextChanged(object sender, TextChangedEventArgs e)
+    private void ScheduleTimes_TextChanged(object? sender, TextChangedEventArgs e)
     {
         if (_initialized)
         {
@@ -309,17 +339,10 @@ public sealed partial class MainWindow
                       && CustomOnInput.TryGetEditedTime(out var on)
                       && CustomOffInput.TryGetEditedTime(out var off)
                       && !IsCustomWindowValid(on, off);
-        var message = invalid
+        ScheduleErrorText.Text = invalid
             ? "Set different turn-on and turn-off times. Matching times would never turn Night Ember on."
             : string.Empty;
-        if (ScheduleErrorText.Text != message)
-        {
-            ScheduleErrorText.Text = message;
-            UIElementAutomationPeer
-                .FromElement(ScheduleErrorText)
-                ?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
-        }
-
+        ScheduleErrorText.IsVisible = invalid;
         return !invalid;
     }
 }

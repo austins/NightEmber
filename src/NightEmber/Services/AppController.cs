@@ -1,15 +1,13 @@
+using Avalonia.Controls;
+using Avalonia.Threading;
 using Microsoft.Win32;
 using NightEmber.Core.Display;
 using NightEmber.Core.Models;
 using NightEmber.Core.Scheduling;
-using NightEmber.Core.Services;
 using NightEmber.TrayIcon;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Windows;
-using System.Windows.Threading;
 
 namespace NightEmber.Services;
 
@@ -20,14 +18,12 @@ internal sealed class AppController : IDisposable
 {
     private const int FadeIntervalMilliseconds = 20;
     private const int NeutralBrightnessPercent = 100;
-    private const int GammaErrorThrottleMinutes = 1;
     private const int SchedulePollIntervalSeconds = 20;
     private const int DriftCheckIntervalSeconds = 3;
     private const int DisplayReapplyDelayMilliseconds = 1200;
 
     private readonly IAppControllerRuntime _runtime;
     private readonly Action _shutdown;
-    private readonly MessageThrottle _gammaErrorThrottle = new(TimeSpan.FromMinutes(GammaErrorThrottleMinutes));
 
     private readonly IGammaService _gammaService;
     private readonly IControllerTimer _scheduleTimer;
@@ -78,7 +74,7 @@ internal sealed class AppController : IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="AppController" /> class.
     /// </summary>
-    /// <param name="dispatcher">The WPF dispatcher that owns UI-bound operations.</param>
+    /// <param name="dispatcher">The Avalonia dispatcher that owns UI-bound operations.</param>
     /// <param name="shutdown">The callback that requests application shutdown.</param>
     public AppController(Dispatcher dispatcher, Action shutdown)
         : this(static () => new GammaService(), new AppControllerRuntime(dispatcher), shutdown, AppSettings.Default)
@@ -115,6 +111,16 @@ internal sealed class AppController : IDisposable
     public AppSettings CurrentSettings => _settings.Clone();
 
     /// <summary>
+    /// Gets the latest display error, or <see langword="null" /> after the next successful gamma write.
+    /// </summary>
+    public string? GammaError { get; private set; }
+
+    /// <summary>
+    /// Occurs when <see cref="GammaError" /> is set or cleared.
+    /// </summary>
+    public event EventHandler? GammaErrorChanged;
+
+    /// <summary>
     /// Gets a value indicating whether sign-in startup is enabled.
     /// </summary>
     public bool IsStartupEnabled => _runtime.IsStartupEnabled;
@@ -147,7 +153,7 @@ internal sealed class AppController : IDisposable
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
-            ReportGammaError(ex.Message);
+            SetGammaError(ex.Message);
         }
 
         // Begin from a known neutral ramp, then let the normal state-change path
@@ -178,7 +184,7 @@ internal sealed class AppController : IDisposable
 
         if (loadResult.Warning is not null)
         {
-            MessageBox.Show(loadResult.Warning, "Night Ember", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.ShowWarning(loadResult.Warning);
         }
     }
 
@@ -397,7 +403,7 @@ internal sealed class AppController : IDisposable
 
     private void ResetForSessionEnding()
     {
-        // WPF shuts the application down after SessionEnding unless cancelled, so the
+        // Windows shuts the application down after the session ends unless cancelled, so the
         // displays are restored now while the dispatcher can still run this work.
         Volatile.Write(ref _exiting, 1);
         StopTimers();
@@ -463,7 +469,7 @@ internal sealed class AppController : IDisposable
             if (!_gammaService.Apply(kelvin, brightness))
             {
                 _gammaRetryNeeded = true;
-                ReportGammaError("The display driver rejected the requested gamma ramp.");
+                SetGammaError("The display driver rejected the requested gamma ramp.");
 
                 // Each rejected write already reopened every display; the drift timer retries later
                 // instead of repeating that work on every fade tick.
@@ -475,11 +481,12 @@ internal sealed class AppController : IDisposable
             _currentKelvin = kelvin;
             _currentBrightness = brightness;
             _gammaRetryNeeded = false;
+            SetGammaError(null);
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
             _gammaRetryNeeded = true;
-            ReportGammaError(ex.Message);
+            SetGammaError(ex.Message);
             StopFade();
             UpdateDriftMonitoring();
         }
@@ -513,7 +520,7 @@ internal sealed class AppController : IDisposable
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
-            ReportGammaError(ex.Message);
+            SetGammaError(ex.Message);
         }
     }
 
@@ -569,7 +576,7 @@ internal sealed class AppController : IDisposable
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
-            ReportGammaError(ex.Message);
+            SetGammaError(ex.Message);
             _reapplyTimer.Start();
         }
     }
@@ -599,18 +606,21 @@ internal sealed class AppController : IDisposable
             _manualOverride is not null,
             _settings.Mode,
             ScheduleService.GetNextChange(_settings, _runtime.Now),
-            CultureInfo.CurrentCulture);
+            CultureInfo.CurrentCulture,
+            GammaError);
         _tray.Update(_isOn, tooltip);
     }
 
-    private void ReportGammaError(string message)
+    private void SetGammaError(string? message)
     {
-        if (_tray is null || !_gammaErrorThrottle.ShouldAllow(message, _runtime.UtcNow))
+        if (GammaError == message)
         {
             return;
         }
 
-        _tray.ShowError(message);
+        GammaError = message;
+        UpdateTray();
+        GammaErrorChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void StopFade()
@@ -713,10 +723,11 @@ internal sealed class AppController : IDisposable
     private static void BringToFront(Window window)
     {
         window.Show();
+        window.Activate();
 
         // Windows can deny foreground activation while the tray menu is closing, leaving the
         // window behind others with only a flashing taskbar button. Toggling Topmost raises it anyway.
-        if (!window.Activate())
+        if (!window.IsActive)
         {
             window.Topmost = true;
             window.Topmost = false;

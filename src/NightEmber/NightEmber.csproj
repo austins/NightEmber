@@ -2,7 +2,7 @@
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <UseWPF>true</UseWPF>
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
         <PublishSingleFile>true</PublishSingleFile>
         <AssemblyTitle>Night Ember</AssemblyTitle>
         <Product>Night Ember</Product>
@@ -11,10 +11,16 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
         <StartupObject>NightEmber.Program</StartupObject>
+        <!-- MainWindow takes its controller in the constructor; XAML is always compiled, never runtime-loaded. -->
+        <NoWarn>$(NoWarn);AVLN3001</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1"/>
+        <PackageReference Include="Avalonia" Version="12.1.6"/>
+        <PackageReference Include="Avalonia.Skia" Version="12.1.6"/>
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6"/>
+        <PackageReference Include="Avalonia.Win32" Version="12.1.6"/>
+        <PackageReference Include="Microsoft.Win32.SystemEvents" Version="11.0.0"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -26,6 +32,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Resource Include="Resources\AppIcon.ico"/>
+        <AvaloniaResource Include="Resources\AppIcon.ico"/>
     </ItemGroup>
 </Project>

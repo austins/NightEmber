@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Controls;
 using NightEmber.Core.Services;
 using System.Runtime.CompilerServices;
 
@@ -11,21 +13,22 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        // Dispatcher exceptions that WPF does not handle also surface here before the process ends.
+        // UI-thread exceptions that Avalonia does not handle also surface here before the process ends.
         AppDomain.CurrentDomain.UnhandledException += static (_, e) => CrashLog.Write(e.ExceptionObject);
 
-        // The watchdog runs for the whole session, so it dispatches before any WPF type
-        // is referenced to avoid loading the presentation stack into the companion process.
+        // The watchdog runs for the whole session, so it dispatches before any Avalonia type
+        // is referenced to avoid loading the UI stack into the companion process.
         return WatchdogService.IsWatchdogCommand(args)
             ? WatchdogService.RunFromCommandLine(args)
-            : RunApplication();
+            : RunApplication(args);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static int RunApplication()
+    private static int RunApplication(string[] args)
     {
-        using var app = new App();
-        app.InitializeComponent();
-        return app.Run();
+        return AppBuilder.Configure<App>()
+            .UseWin32()
+            .UseSkia()
+            .StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
     }
 }

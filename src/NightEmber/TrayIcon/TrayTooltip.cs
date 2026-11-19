@@ -9,7 +9,7 @@ namespace NightEmber.TrayIcon;
 internal static class TrayTooltip
 {
     /// <summary>
-    /// Formats the two-line tray tooltip.
+    /// Formats the two-line tray tooltip, with a third line while a display error is outstanding.
     /// </summary>
     /// <param name="isOn">Whether the tint is active.</param>
     /// <param name="temperature">The configured color temperature in Kelvin.</param>
@@ -17,6 +17,7 @@ internal static class TrayTooltip
     /// <param name="mode">The configured schedule mode.</param>
     /// <param name="nextChange">The next schedule boundary, or <see langword="null" /> when none exists.</param>
     /// <param name="culture">The culture used to format the next-change time.</param>
+    /// <param name="gammaError">The outstanding display error, or <see langword="null" /> when there is none.</param>
     /// <returns>The tooltip text.</returns>
     public static string Format(
         bool isOn,
@@ -24,7 +25,8 @@ internal static class TrayTooltip
         bool hasManualOverride,
         ScheduleMode mode,
         DateTime? nextChange,
-        CultureInfo culture)
+        CultureInfo culture,
+        string? gammaError = null)
     {
         var state = isOn ? $"Night Ember on - {temperature}K" : "Night Ember off";
         var time = nextChange?.ToString(culture.DateTimeFormat.ShortTimePattern, culture) ?? string.Empty;
@@ -47,6 +49,7 @@ internal static class TrayTooltip
             };
         }
 
-        return $"{state}\n{reason}";
+        var tooltip = $"{state}\n{reason}";
+        return string.IsNullOrEmpty(gammaError) ? tooltip : $"{tooltip}\n{gammaError}";
     }
 }

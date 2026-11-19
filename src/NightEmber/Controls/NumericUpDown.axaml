@@ -1,0 +1,23 @@
+<UserControl x:Class="NightEmber.Controls.NumericUpDown"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             MinWidth="70"
+             Focusable="True"
+             IsTabStop="False">
+    <ButtonSpinner x:Name="Spinner"
+                   IsTabStop="False"
+                   Padding="0"
+                   MinWidth="0"
+                   HorizontalContentAlignment="Stretch"
+                   VerticalContentAlignment="Stretch"
+                   Spin="Spinner_Spin">
+        <TextBox x:Name="ValueTextBox"
+                 Background="Transparent"
+                 BorderBrush="Transparent"
+                 Margin="-1"
+                 MinWidth="0"
+                 AcceptsReturn="False"
+                 TextWrapping="NoWrap"
+                 TextAlignment="Right" />
+    </ButtonSpinner>
+</UserControl>

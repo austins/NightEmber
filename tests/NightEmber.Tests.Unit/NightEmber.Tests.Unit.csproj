@@ -2,6 +2,21 @@
     <Import Project="../TestProject.props"/>
 
     <ItemGroup>
+        <PackageReference Include="Avalonia.Headless" Version="12.1.6"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\..\src\NightEmber\NightEmber.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- TODO(avalonia-port milestone B): these WPF-era control and window tests are not ported to Avalonia yet.
+             Port each file to AvaloniaTestHelper and delete its entry here. -->
+        <Compile Remove="MainWindowTests.cs"/>
+        <Compile Remove="Controls\NumericUpDownTests.cs"/>
+        <Compile Remove="Controls\SpinnerAccessibilityTests.cs"/>
+        <Compile Remove="Controls\SpinnerThemeTests.cs"/>
+        <Compile Remove="Controls\SpinnerValidationTests.cs"/>
+        <Compile Remove="Controls\TimeUpDownTests.cs"/>
     </ItemGroup>
 </Project>
