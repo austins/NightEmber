@@ -60,6 +60,7 @@ public sealed partial class NumericUpDown : UserControl
     private readonly bool _ready;
     private bool _updatingText;
     private bool _validateEdits;
+    private bool _ignoreSpin;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NumericUpDown" /> class.
@@ -67,8 +68,10 @@ public sealed partial class NumericUpDown : UserControl
     public NumericUpDown()
     {
         InitializeComponent();
+        Spinner.AddHandler(KeyDownEvent, Spinner_PreviewKeyDown, RoutingStrategies.Tunnel);
+        Spinner.AddHandler(KeyDownEvent, Spinner_KeyDown, RoutingStrategies.Bubble, handledEventsToo: true);
         ValueTextBox.AddHandler(KeyDownEvent, ValueTextBox_KeyDown, RoutingStrategies.Tunnel);
-        ValueTextBox.TextChanged += ValueTextBox_TextChanged;
+        ValueTextBox.TextChanging += ValueTextBox_TextChanging;
         ValueTextBox.LostFocus += ValueTextBox_LostFocus;
         _ready = true;
         UpdateText();
@@ -220,7 +223,7 @@ public sealed partial class NumericUpDown : UserControl
         Avalonia.Automation.AutomationProperties.SetItemStatus(ValueTextBox, message.Length > 0 ? message : null);
     }
 
-    private void ValueTextBox_TextChanged(object? sender, TextChangedEventArgs e)
+    private void ValueTextBox_TextChanging(object? sender, TextChangingEventArgs e)
     {
         if (!_updatingText && _validateEdits)
         {
@@ -228,8 +231,24 @@ public sealed partial class NumericUpDown : UserControl
         }
     }
 
+    private void Spinner_PreviewKeyDown(object? sender, KeyEventArgs e)
+    {
+        // ButtonSpinner spins on Up and Down whatever the modifiers; modified arrows keep their text-editing meaning.
+        _ignoreSpin = e.KeyModifiers != KeyModifiers.None && e.Key is Key.Up or Key.Down;
+    }
+
+    private void Spinner_KeyDown(object? sender, KeyEventArgs e)
+    {
+        _ignoreSpin = false;
+    }
+
     private void Spinner_Spin(object? sender, SpinEventArgs e)
     {
+        if (_ignoreSpin)
+        {
+            return;
+        }
+
         ChangeValue(e.Direction == SpinDirection.Increase ? 1 : -1);
     }
 

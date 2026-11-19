@@ -4,6 +4,18 @@
              RequestedThemeVariant="Default">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- The spinners show their validation message once, in the settings window. DataValidationErrors keeps
+                 only the :error pseudo-class on the spinner, which draws the outline, so this theme omits the
+                 inline message list that the default template adds below the editor. -->
+            <ControlTheme x:Key="OutlineOnlyDataValidationErrors" TargetType="DataValidationErrors">
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="InputErrorBrush" Color="#C42B1C" />
@@ -19,6 +31,12 @@
         <Style Selector="Button">
             <Setter Property="Padding" Value="18,7" />
             <Setter Property="MinWidth" Value="82" />
+        </Style>
+        <Style Selector="ButtonSpinner /template/ DataValidationErrors">
+            <Setter Property="Theme" Value="{DynamicResource OutlineOnlyDataValidationErrors}" />
+        </Style>
+        <Style Selector="ButtonSpinner:error">
+            <Setter Property="BorderBrush" Value="{DynamicResource InputErrorBrush}" />
         </Style>
     </Application.Styles>
 </Application>

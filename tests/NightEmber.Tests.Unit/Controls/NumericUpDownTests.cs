@@ -1,10 +1,11 @@
-using NightEmber.Controls;
+using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using System.Globalization;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Data;
-using System.Windows.Input;
+using static NightEmber.Tests.Unit.Controls.SpinnerTestHelper;
+using NumericUpDown = NightEmber.Controls.NumericUpDown;
 
 namespace NightEmber.Tests.Unit.Controls;
 
@@ -17,7 +18,7 @@ public sealed class NumericUpDownTests
     [InlineData(101, 100)]
     public async Task NumericValue_OutsideRange_IsCoerced(int value, int expected)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown
@@ -38,7 +39,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public async Task RangeChanges_ExistingValue_RecoercesAndRefreshesText()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown { NumericValue = 50 };
@@ -62,7 +63,7 @@ public sealed class NumericUpDownTests
     [InlineData(25, 25)]
     public async Task Increment_InvalidValue_IsCoercedToPositive(int increment, int expected)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown();
@@ -87,7 +88,7 @@ public sealed class NumericUpDownTests
     [InlineData("2147483648", 25, false)]
     public async Task CommitEdit_ValidOrInvalidText_CommitsOrPreservesInvalidEdit(string text, int expected, bool valid)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
@@ -101,7 +102,7 @@ public sealed class NumericUpDownTests
             committed.Should().Be(valid);
             control.NumericValue.Should().Be(expected);
             Input(control).Text.Should().Be(text);
-            InputValidation.GetHasError(control).Should().Be(!valid);
+            HasError(control).Should().Be(!valid);
         });
     }
 
@@ -112,7 +113,7 @@ public sealed class NumericUpDownTests
     [InlineData(Key.Down, 40, 30)]
     public async Task ArrowKeys_ValueNearBoundary_AdjustsAndClamps(Key key, int initial, int expected)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown
@@ -120,14 +121,17 @@ public sealed class NumericUpDownTests
                 NumericValue = initial,
                 Increment = 10
             };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
 
             // Act
-            var args = WpfTestHelper.PressKey(Input(control), key);
+            var handled = AvaloniaTestHelper.PressKey(window, key);
 
             // Assert
-            args.Handled.Should().BeTrue();
+            handled.Should().BeTrue();
             control.NumericValue.Should().Be(expected);
             Input(control).SelectedText.Should().Be(Input(control).Text);
+            window.Close();
         });
     }
 
@@ -136,28 +140,31 @@ public sealed class NumericUpDownTests
     [InlineData(Key.Escape, 25)]
     public async Task EditKeys_PendingText_CommitsOrCancels(Key key, int expected)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown { NumericValue = 25 };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             Input(control).Text = "42";
 
             // Act
-            var args = WpfTestHelper.PressKey(Input(control), key);
+            var handled = AvaloniaTestHelper.PressKey(window, key);
 
             // Assert
-            args.Handled.Should().BeTrue();
+            handled.Should().BeTrue();
             control.NumericValue.Should().Be(expected);
             Input(control).Text.Should().Be(expected.ToString(CultureInfo.CurrentCulture));
+            window.Close();
         });
     }
 
     [Theory]
-    [InlineData(0, 45)]
-    [InlineData(1, 35)]
-    public async Task SpinnerButtons_PendingEdit_CommitsBeforeAdjusting(int buttonIndex, int expected)
+    [InlineData(true, 45)]
+    [InlineData(false, 35)]
+    public async Task SpinnerButtons_PendingEdit_CommitsBeforeAdjusting(bool increase, int expected)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown
@@ -165,136 +172,136 @@ public sealed class NumericUpDownTests
                 NumericValue = 25,
                 Increment = 5
             };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
             Input(control).Text = "40";
-            var layout = (Grid)((Border)control.Content).Child;
-            var buttons = (Grid)layout.Children[1];
 
             // Act
-            ((RepeatButton)buttons.Children[buttonIndex]).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            ArrowButton(control, increase).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
             // Assert
             control.NumericValue.Should().Be(expected);
+            window.Close();
         });
     }
 
     [Fact]
     public async Task CommitEdit_TwoWayBoundValue_PreservesBindingAndUpdatesSource()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var source = new NumericUpDown { NumericValue = 25 };
             var control = new NumericUpDown();
-            BindingOperations.SetBinding(
-                control,
+            control.Bind(
                 NumericUpDown.NumericValueProperty,
-                new Binding(nameof(NumericUpDown.NumericValue)) { Source = source });
+                new Binding(nameof(NumericUpDown.NumericValue))
+                {
+                    Source = source,
+                    Mode = BindingMode.TwoWay
+                });
             Input(control).Text = "42";
 
             // Act
             control.CommitEdit();
+            var sourceAfterCommit = source.NumericValue;
+            source.NumericValue = 60;
 
             // Assert
-            BindingOperations.IsDataBound(control, NumericUpDown.NumericValueProperty).Should().BeTrue();
-            source.NumericValue.Should().Be(42);
+            sourceAfterCommit.Should().Be(42);
+            control.NumericValue.Should().Be(60);
+            Input(control).Text.Should().Be("60");
         });
     }
 
     [Fact]
-    public async Task LostKeyboardFocus_PendingEdit_CommitsValue()
+    public async Task LostFocus_PendingEdit_CommitsValue()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown { NumericValue = 25 };
-            var input = Input(control);
-            input.Text = "42";
+            var window = ShowWithNeighbor(control, out var other);
+            Focus(control);
+            Input(control).Text = "42";
 
             // Act
-            input.RaiseEvent(
-                new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, input, null)
-                {
-                    RoutedEvent = Keyboard.LostKeyboardFocusEvent
-                });
+            other.Focus();
 
             // Assert
             control.NumericValue.Should().Be(42);
+            window.Close();
         });
     }
 
     [Theory]
     [InlineData("42")]
-    [InlineData("")]
     [InlineData("-42")]
     [InlineData("4 2")]
     [InlineData("12.5")]
     [InlineData("abc")]
-    public async Task Paste_Text_DoesNotSilentlyDiscardInvalidEdits(string text)
-    {
-        await WpfTestHelper.RunAsync(() =>
-        {
-            // Arrange
-            var control = new NumericUpDown();
-            var data = new DataObject(DataFormats.UnicodeText, text);
-            var args = new DataObjectPastingEventArgs(data, false, DataFormats.UnicodeText);
-
-            // Act
-            Input(control).RaiseEvent(args);
-
-            // Assert
-            args.CommandCancelled.Should().BeFalse();
-        });
-    }
-
-    [Theory]
-    [InlineData("42")]
-    [InlineData("a")]
     [InlineData("-")]
     [InlineData(".")]
-    public async Task TextInput_Text_LeavesValidationToCommit(string text)
+    public async Task Typing_Text_IsNotFilteredAndLeavesValidationToCommit(string text)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
-            var control = new NumericUpDown();
-            var input = Input(control);
-            var composition = new TextComposition(InputManager.Current, input, text);
-            var args = new TextCompositionEventArgs(Keyboard.PrimaryDevice, composition)
-            {
-                RoutedEvent = TextCompositionManager.PreviewTextInputEvent
-            };
+            var control = new NumericUpDown { NumericValue = 25 };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
+            Input(control).SelectAll();
 
             // Act
-            input.RaiseEvent(args);
+            window.KeyTextInput(text);
 
             // Assert
-            args.Handled.Should().BeFalse();
+            Input(control).Text.Should().Be(text);
+            HasError(control).Should().BeFalse();
+            control.NumericValue.Should().Be(25);
+            window.Close();
         });
     }
 
     [Fact]
     public async Task MouseWheel_WithoutKeyboardFocus_DoesNotChangeValueOrConsumeScroll()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new NumericUpDown { NumericValue = 25 };
-            var args = new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, 120)
-            {
-                RoutedEvent = Mouse.PreviewMouseWheelEvent
-            };
+            var window = ShowWithNeighbor(control, out var other);
+            other.Focus();
 
             // Act
-            control.RaiseEvent(args);
+            var handled = WheelOver(window, control);
 
             // Assert
             control.NumericValue.Should().Be(25);
-            args.Handled.Should().BeFalse();
+            handled.Should().BeFalse();
+            window.Close();
         });
     }
 
-    private static TextBox Input(NumericUpDown control)
+    [Fact]
+    public async Task MouseWheel_WithKeyboardFocus_AdjustsByTheIncrement()
     {
-        return (TextBox)control.FindName("ValueTextBox")!;
+        await AvaloniaTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            var control = new NumericUpDown
+            {
+                NumericValue = 25,
+                Increment = 5
+            };
+            var window = ShowWithNeighbor(control, out _);
+            Focus(control);
+
+            // Act
+            WheelOver(window, control);
+
+            // Assert
+            control.NumericValue.Should().Be(30);
+            window.Close();
+        });
     }
 }

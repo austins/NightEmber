@@ -1,12 +1,12 @@
+using Avalonia.Automation;
+using Avalonia.Automation.Peers;
+using Avalonia.Automation.Provider;
+using Avalonia.Controls;
+using Avalonia.Input;
 using NightEmber.Controls;
 using System.Globalization;
-using System.Windows;
-using System.Windows.Automation;
-using System.Windows.Automation.Peers;
-using System.Windows.Automation.Provider;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
+using static NightEmber.Tests.Unit.Controls.SpinnerTestHelper;
+using NumericUpDown = NightEmber.Controls.NumericUpDown;
 
 namespace NightEmber.Tests.Unit.Controls;
 
@@ -17,7 +17,7 @@ public sealed class SpinnerAccessibilityTests
     [InlineData(true)]
     public async Task Input_AccessibilityProperties_ExposeLabelHelpShortcutAndValue(bool timeInput)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             UserControl control = timeInput ? new TimeUpDown() : new NumericUpDown();
@@ -33,14 +33,11 @@ public sealed class SpinnerAccessibilityTests
             var host = new StackPanel();
             host.Children.Add(label);
             host.Children.Add(control);
-            host.Measure(new Size(200, 100));
-            host.Arrange(new Rect(0, 0, 200, 100));
-            host.UpdateLayout();
-            _ = UIElementAutomationPeer.CreatePeerForElement(label);
+            var window = AvaloniaTestHelper.ShowInWindow(host);
 
             // Act
-            var peer = UIElementAutomationPeer.CreatePeerForElement(input);
-            var value = (IValueProvider)peer.GetPattern(PatternInterface.Value);
+            var peer = ControlAutomationPeer.CreatePeerForElement(input);
+            var value = peer.GetProvider<IValueProvider>()!;
 
             // Assert
             AutomationProperties.GetLabeledBy(input).Should().BeSameAs(label);
@@ -49,6 +46,7 @@ public sealed class SpinnerAccessibilityTests
             peer.GetAcceleratorKey().Should().Be("Alt+I");
             value.Value.Should().Be(input.Text);
             value.IsReadOnly.Should().BeFalse();
+            window.Close();
         });
     }
 
@@ -57,31 +55,27 @@ public sealed class SpinnerAccessibilityTests
     [InlineData(true)]
     public async Task Input_TabNavigation_ExposesOnlyTheEditableTextBox(bool timeInput)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             UserControl control = timeInput ? new TimeUpDown() : new NumericUpDown();
-            var grid = (Grid)((Border)control.Content).Child;
-            var arrows = ((Grid)grid.Children[1]).Children.OfType<RepeatButton>().ToArray();
+            var window = ShowWithNeighbor(control, out var other);
+            Focus(control);
+            var arrows = new[] { ArrowButton(control, true), ArrowButton(control, false) };
 
             // Act
-            var tab = WpfTestHelper.PressKey(Input(control), Key.Tab);
+            AvaloniaTestHelper.PressKey(window, Key.Tab);
+            var afterTab = window.FocusManager.GetFocusedElement();
+            AvaloniaTestHelper.PressKey(window, Key.Tab, KeyModifiers.Shift);
+            var afterShiftTab = window.FocusManager.GetFocusedElement();
 
             // Assert
-            control.Focusable.Should().BeFalse();
             control.IsTabStop.Should().BeFalse();
-            KeyboardNavigation.GetTabNavigation(control).Should().Be(KeyboardNavigationMode.Once);
             Input(control).IsTabStop.Should().BeTrue();
-            arrows
-                .Should()
-                .HaveCount(2)
-                .And
-                .AllSatisfy(static arrow =>
-                {
-                    arrow.Focusable.Should().BeFalse();
-                    arrow.IsTabStop.Should().BeFalse();
-                });
-            tab.Handled.Should().BeFalse();
+            arrows.Should().AllSatisfy(static arrow => arrow.IsTabStop.Should().BeFalse());
+            afterTab.Should().BeSameAs(other);
+            afterShiftTab.Should().BeSameAs(Input(control));
+            window.Close();
         });
     }
 
@@ -94,30 +88,28 @@ public sealed class SpinnerAccessibilityTests
         string next,
         string last)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var culture = (CultureInfo)CultureInfo.GetCultureInfo("en-US").Clone();
             culture.DateTimeFormat.ShortTimePattern = pattern;
             CultureInfo.CurrentCulture = culture;
             var control = new TimeUpDown { TimeValue = TimeSpan.FromHours(21) };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             var input = Input(control);
-            var peer = UIElementAutomationPeer.CreatePeerForElement(input);
-            var statuses = new List<string> { peer.GetItemStatus() };
+            var peer = ControlAutomationPeer.CreatePeerForElement(input);
+            var statuses = new List<string?> { peer.GetItemStatus() };
 
             // Act
-            WpfTestHelper.PressKey(input, Key.Right);
+            AvaloniaTestHelper.PressKey(window, Key.Right);
             statuses.Add(peer.GetItemStatus());
-            WpfTestHelper.PressKey(input, Key.Right);
+            AvaloniaTestHelper.PressKey(window, Key.Right);
             statuses.Add(peer.GetItemStatus());
 
             // Assert
             statuses.Should().Equal(initial, next, last);
+            window.Close();
         });
-    }
-
-    private static TextBox Input(UserControl control)
-    {
-        return (TextBox)((Grid)((Border)control.Content).Child).Children[0];
     }
 }

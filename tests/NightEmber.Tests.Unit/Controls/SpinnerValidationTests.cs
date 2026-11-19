@@ -1,39 +1,45 @@
+using Avalonia.Automation;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using NightEmber.Controls;
 using System.Globalization;
-using System.Windows;
-using System.Windows.Automation;
-using System.Windows.Automation.Peers;
-using System.Windows.Controls;
-using System.Windows.Input;
+using static NightEmber.Tests.Unit.Controls.SpinnerTestHelper;
+using NumericUpDown = NightEmber.Controls.NumericUpDown;
 
 namespace NightEmber.Tests.Unit.Controls;
 
 public sealed class SpinnerValidationTests
 {
     [Theory]
-    [InlineData(false, Key.Up, ModifierKeys.Control)]
-    [InlineData(false, Key.Down, ModifierKeys.Shift)]
-    [InlineData(false, Key.Enter, ModifierKeys.Alt)]
-    [InlineData(true, Key.Up, ModifierKeys.Control)]
-    [InlineData(true, Key.Down, ModifierKeys.Shift)]
-    [InlineData(true, Key.Enter, ModifierKeys.Alt)]
-    public async Task ModifiedKey_InvalidEdit_LeavesTheGestureUnhandled(bool timeInput, Key key, ModifierKeys modifiers)
+    [InlineData(false, Key.Up, KeyModifiers.Control)]
+    [InlineData(false, Key.Down, KeyModifiers.Shift)]
+    [InlineData(false, Key.Enter, KeyModifiers.Alt)]
+    [InlineData(true, Key.Up, KeyModifiers.Control)]
+    [InlineData(true, Key.Down, KeyModifiers.Shift)]
+    [InlineData(true, Key.Enter, KeyModifiers.Alt)]
+    public async Task ModifiedKey_InvalidEdit_KeepsTextEditingBehaviorWithoutValidating(
+        bool timeInput,
+        Key key,
+        KeyModifiers modifiers)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = CreateInput(timeInput);
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             var input = Input(control);
             input.Text = "invalid";
 
             // Act
-            var args = WpfTestHelper.PressKey(input, key, modifiers);
+            AvaloniaTestHelper.PressKey(window, key, modifiers);
 
             // Assert
-            args.Handled.Should().BeFalse();
             input.Text.Should().Be("invalid");
-            InputValidation.GetHasError(control).Should().BeFalse();
+            HasError(control).Should().BeFalse();
             PreviousValueIsUnchanged(control);
+            window.Close();
         });
     }
 
@@ -42,31 +48,29 @@ public sealed class SpinnerValidationTests
     [InlineData(true)]
     public async Task LostFocus_InvalidEdit_PreservesTextAndExposesAccessibleError(bool timeInput)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = CreateInput(timeInput);
+            var window = ShowWithNeighbor(control, out var other);
+            Focus(control);
             var input = Input(control);
-            var peer = UIElementAutomationPeer.CreatePeerForElement(input);
             input.Text = "invalid";
-            var errorBeforeCommit = InputValidation.GetHasError(control);
+            var errorBeforeCommit = HasError(control);
 
             // Act
-            input.RaiseEvent(
-                new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, input, null)
-                {
-                    RoutedEvent = Keyboard.LostKeyboardFocusEvent
-                });
+            other.Focus();
             var committedAgain = Commit(control);
 
             // Assert
             errorBeforeCommit.Should().BeFalse();
             input.Text.Should().Be("invalid");
             committedAgain.Should().BeFalse();
-            InputValidation.GetHasError(control).Should().BeTrue();
-            peer.GetItemStatus().Should().Be(InputValidation.GetErrorMessage(control));
-            peer.GetItemStatus().Should().NotBeNullOrWhiteSpace();
+            HasError(control).Should().BeTrue();
+            AutomationProperties.GetItemStatus(input).Should().Be(ErrorMessage(control));
+            AutomationProperties.GetItemStatus(input).Should().NotBeNullOrWhiteSpace();
             PreviousValueIsUnchanged(control);
+            window.Close();
         });
     }
 
@@ -75,7 +79,7 @@ public sealed class SpinnerValidationTests
     [InlineData(true)]
     public async Task Correction_AfterValidation_UpdatesErrorWithoutDiscardingText(bool timeInput)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = CreateInput(timeInput);
@@ -85,9 +89,9 @@ public sealed class SpinnerValidationTests
 
             // Act
             input.Text = timeInput ? "09:45" : "5000";
-            var corrected = InputValidation.GetHasError(control);
+            var corrected = HasError(control);
             input.Text = timeInput ? "99:45" : "5001";
-            var invalidAgain = InputValidation.GetHasError(control);
+            var invalidAgain = HasError(control);
             input.Text = timeInput ? "09:45" : "5000";
             var committed = Commit(control);
 
@@ -95,8 +99,8 @@ public sealed class SpinnerValidationTests
             corrected.Should().BeFalse();
             invalidAgain.Should().BeTrue();
             committed.Should().BeTrue();
-            InputValidation.GetHasError(control).Should().BeFalse();
-            InputValidation.GetErrorMessage(control).Should().BeEmpty();
+            HasError(control).Should().BeFalse();
+            ErrorMessage(control).Should().BeEmpty();
             input.Text.Should().Be(timeInput ? "09:45" : "5000");
         });
     }
@@ -110,21 +114,24 @@ public sealed class SpinnerValidationTests
     [InlineData(true, Key.Down)]
     public async Task AdjustmentOrCommit_InvalidEdit_DoesNotSilentlyReplaceIt(bool timeInput, Key key)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = CreateInput(timeInput);
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             var input = Input(control);
             input.Text = "invalid";
 
             // Act
-            var args = WpfTestHelper.PressKey(input, key);
+            var handled = AvaloniaTestHelper.PressKey(window, key);
 
             // Assert
-            args.Handled.Should().BeTrue();
+            handled.Should().BeTrue();
             input.Text.Should().Be("invalid");
-            InputValidation.GetHasError(control).Should().BeTrue();
+            HasError(control).Should().BeTrue();
             PreviousValueIsUnchanged(control);
+            window.Close();
         });
     }
 
@@ -133,84 +140,81 @@ public sealed class SpinnerValidationTests
     [InlineData(true)]
     public async Task Escape_InvalidEdit_RestoresValueAndClearsError(bool timeInput)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = CreateInput(timeInput);
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             var input = Input(control);
             input.Text = "invalid";
             Commit(control);
 
             // Act
-            WpfTestHelper.PressKey(input, Key.Escape);
+            AvaloniaTestHelper.PressKey(window, Key.Escape);
 
             // Assert
             input.Text.Should().Be(timeInput ? "21:00" : "300");
-            InputValidation.GetHasError(control).Should().BeFalse();
-            AutomationProperties.GetItemStatus(input).Should().Be(timeInput ? "Hour selected" : string.Empty);
+            HasError(control).Should().BeFalse();
+            AutomationProperties.GetItemStatus(input).Should().Be(timeInput ? "Hour selected" : null);
             PreviousValueIsUnchanged(control);
+            window.Close();
         });
     }
 
     [Theory]
-    [InlineData(Key.Left)]
-    [InlineData(Key.Right)]
-    public async Task HorizontalArrows_PendingTimeEdit_AllowNormalCaretNavigation(Key key)
+    [InlineData(Key.Left, 4)]
+    [InlineData(Key.Right, 6)]
+    public async Task HorizontalArrows_PendingTimeEdit_AllowNormalCaretNavigation(Key key, int expectedCaret)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = CreateInput(true);
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             var input = Input(control);
             input.Text = "1212:00 PM";
+            input.CaretIndex = 5;
 
             // Act
-            var args = WpfTestHelper.PressKey(input, key);
+            AvaloniaTestHelper.PressKey(window, key);
 
             // Assert
-            args.Handled.Should().BeFalse();
             input.Text.Should().Be("1212:00 PM");
+            input.CaretIndex.Should().Be(expectedCaret);
+            input.SelectedText.Should().BeEmpty();
+            window.Close();
         });
     }
 
     [Theory]
-    [InlineData(false, "Light")]
-    [InlineData(false, "Dark")]
-    [InlineData(false, "HC")]
-    [InlineData(true, "Light")]
-    [InlineData(true, "Dark")]
-    [InlineData(true, "HC")]
-    public async Task InvalidEdit_ThemeOutline_UsesCriticalBrushWithoutMovingContent(bool timeInput, string theme)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvalidEdit_Outline_ShowsOneErrorMessageOwnedByTheWindow(bool timeInput)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = CreateInput(timeInput);
-            control.Resources.MergedDictionaries.Add(
-                new ResourceDictionary
-                {
-                    Source = new Uri(
-                        $"/PresentationFramework.Fluent;component/Themes/Fluent.{theme}.xaml",
-                        UriKind.Relative)
-                });
-            var border = (Border)control.Content;
-            Layout(control);
-            var before = border.Child.RenderSize;
+            var window = AvaloniaTestHelper.ShowInWindow(control);
             Input(control).Text = "invalid";
+            var heightBefore = control.Bounds.Height;
 
             // Act
             Commit(control);
-            Layout(control);
-            var errorBrush = border.BorderBrush;
-            var after = border.Child.RenderSize;
-            control.IsEnabled = false;
-            Layout(control);
+            window.UpdateLayout();
 
             // Assert
-            errorBrush.Should().BeSameAs(control.FindResource("SystemFillColorCriticalBrush"));
-            after.Should().Be(before);
-            border.BorderBrush.Should().BeSameAs(control.FindResource("ControlStrongStrokeColorDefaultBrush"));
-            InputValidation.GetHasError(control).Should().BeTrue();
+            HasError(control).Should().BeTrue();
+            control.Bounds.Height.Should().Be(heightBefore);
+            Spinner(control)
+                .GetVisualDescendants()
+                .OfType<TextBlock>()
+                .Where(static text => text.IsVisible && !string.IsNullOrEmpty(text.Text))
+                .Should()
+                .BeEmpty("the settings window shows the message, so the control only draws the outline");
+            window.Close();
         });
     }
 
@@ -226,16 +230,6 @@ public sealed class SpinnerValidationTests
             };
     }
 
-    private static TextBox Input(UserControl control)
-    {
-        return (TextBox)control.FindName("ValueTextBox");
-    }
-
-    private static bool Commit(UserControl control)
-    {
-        return control is TimeUpDown time ? time.CommitEdit() : ((NumericUpDown)control).CommitEdit();
-    }
-
     private static void PreviousValueIsUnchanged(UserControl control)
     {
         if (control is TimeUpDown time)
@@ -246,12 +240,5 @@ public sealed class SpinnerValidationTests
         {
             ((NumericUpDown)control).NumericValue.Should().Be(300);
         }
-    }
-
-    private static void Layout(FrameworkElement control)
-    {
-        control.Measure(new Size(110, 28));
-        control.Arrange(new Rect(0, 0, 110, 28));
-        control.UpdateLayout();
     }
 }

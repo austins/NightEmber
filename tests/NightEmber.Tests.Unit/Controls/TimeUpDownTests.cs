@@ -1,10 +1,11 @@
+using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using NightEmber.Controls;
 using System.Globalization;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Data;
-using System.Windows.Input;
+using static NightEmber.Tests.Unit.Controls.SpinnerTestHelper;
 
 namespace NightEmber.Tests.Unit.Controls;
 
@@ -18,7 +19,7 @@ public sealed class TimeUpDownTests
     [InlineData(-1441, 1439)]
     public async Task TimeValue_OutsideDay_WrapsIntoTimeOfDay(int minutes, int expectedMinutes)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new TimeUpDown();
@@ -38,7 +39,7 @@ public sealed class TimeUpDownTests
     [InlineData(60, 59)]
     public async Task MinuteIncrement_OutOfRange_IsClamped(int increment, int expected)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new TimeUpDown();
@@ -66,7 +67,7 @@ public sealed class TimeUpDownTests
         int hour,
         int minute)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture(cultureName, pattern);
@@ -93,7 +94,7 @@ public sealed class TimeUpDownTests
     [InlineData("01/01/0001 09:00")]
     public async Task CommitEdit_InvalidText_PreservesEditAndPreviousValue(string text)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-GB", "HH:mm");
@@ -107,8 +108,8 @@ public sealed class TimeUpDownTests
             committed.Should().BeFalse();
             control.TimeValue.Should().Be(new TimeSpan(7, 5, 0));
             Input(control).Text.Should().Be(text);
-            InputValidation.GetHasError(control).Should().BeTrue();
-            InputValidation.GetErrorMessage(control).Should().Contain("21:00");
+            HasError(control).Should().BeTrue();
+            control.ErrorMessage.Should().Contain("21:00");
         });
     }
 
@@ -117,19 +118,22 @@ public sealed class TimeUpDownTests
     [InlineData(Key.Down, 0, 23)]
     public async Task HourAdjustment_DayBoundary_WrapsAtMidnight(Key key, int initialHour, int expectedHour)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-GB", "HH:mm");
             var control = new TimeUpDown { TimeValue = new TimeSpan(initialHour, 15, 0) };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
 
             // Act
-            var args = WpfTestHelper.PressKey(Input(control), key);
+            var handled = AvaloniaTestHelper.PressKey(window, key);
 
             // Assert
-            args.Handled.Should().BeTrue();
+            handled.Should().BeTrue();
             control.TimeValue.Should().Be(new TimeSpan(expectedHour, 15, 0));
             Input(control).SelectedText.Should().Be(expectedHour.ToString("D2", CultureInfo.InvariantCulture));
+            window.Close();
         });
     }
 
@@ -143,7 +147,7 @@ public sealed class TimeUpDownTests
         int expectedHour,
         int expectedMinute)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-GB", "HH:mm");
@@ -152,14 +156,17 @@ public sealed class TimeUpDownTests
                 TimeValue = new TimeSpan(hour, minute, 0),
                 MinuteIncrement = 5
             };
-            WpfTestHelper.PressKey(Input(control), Key.Right);
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
+            AvaloniaTestHelper.PressKey(window, Key.Right);
 
             // Act
-            WpfTestHelper.PressKey(Input(control), key);
+            AvaloniaTestHelper.PressKey(window, key);
 
             // Assert
             control.TimeValue.Should().Be(new TimeSpan(expectedHour, expectedMinute, 0));
             Input(control).SelectedText.Should().Be(expectedMinute.ToString("D2", CultureInfo.InvariantCulture));
+            window.Close();
         });
     }
 
@@ -172,73 +179,77 @@ public sealed class TimeUpDownTests
         int caretIndex,
         string expectedSelection)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-US", pattern);
             var control = new TimeUpDown { TimeValue = new TimeSpan(7, 5, 0) };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             var input = Input(control);
             input.CaretIndex = caretIndex;
-            input.RaiseEvent(
-                new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
-                {
-                    RoutedEvent = UIElement.PreviewMouseLeftButtonUpEvent
-                });
+            window.MouseUp(Center(input, window), MouseButton.Left);
 
             // Act
-            WpfTestHelper.PressKey(input, Key.Up);
+            AvaloniaTestHelper.PressKey(window, Key.Up);
 
             // Assert
             control.TimeValue.Should().Be(new TimeSpan(19, 5, 0));
             input.SelectedText.Should().Be(expectedSelection);
+            window.Close();
         });
     }
 
     [Fact]
     public async Task SegmentNavigation_FormattedTime_SelectsAndWrapsSegments()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-US", "h:mm tt");
             var control = new TimeUpDown { TimeValue = new TimeSpan(7, 5, 0) };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             var input = Input(control);
 
             // Act
-            WpfTestHelper.PressKey(input, Key.Right);
+            var initial = input.SelectedText;
+            AvaloniaTestHelper.PressKey(window, Key.Right);
             var minute = input.SelectedText;
-            WpfTestHelper.PressKey(input, Key.Right);
+            AvaloniaTestHelper.PressKey(window, Key.Right);
             var period = input.SelectedText;
-            WpfTestHelper.PressKey(input, Key.Right);
+            AvaloniaTestHelper.PressKey(window, Key.Right);
             var wrappedHour = input.SelectedText;
-            WpfTestHelper.PressKey(input, Key.Left);
+            AvaloniaTestHelper.PressKey(window, Key.Left);
 
             // Assert
+            initial.Should().Be("7");
             minute.Should().Be("05");
             period.Should().Be("AM");
             wrappedHour.Should().Be("7");
             input.SelectedText.Should().Be("AM");
+            window.Close();
         });
     }
 
     [Theory]
-    [InlineData(0, 8)]
-    [InlineData(1, 6)]
-    public async Task SpinnerButtons_HourSelected_AdjustsHour(int buttonIndex, int expectedHour)
+    [InlineData(true, 8)]
+    [InlineData(false, 6)]
+    public async Task SpinnerButtons_HourSelected_AdjustsHour(bool increase, int expectedHour)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-GB", "HH:mm");
             var control = new TimeUpDown { TimeValue = new TimeSpan(7, 5, 0) };
-            var layout = (Grid)((Border)control.Content).Child;
-            var buttons = (Grid)layout.Children[1];
+            var window = AvaloniaTestHelper.ShowInWindow(control);
 
             // Act
-            ((RepeatButton)buttons.Children[buttonIndex]).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            ArrowButton(control, increase).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
             // Assert
             control.TimeValue.Should().Be(new TimeSpan(expectedHour, 5, 0));
+            window.Close();
         });
     }
 
@@ -247,95 +258,128 @@ public sealed class TimeUpDownTests
     [InlineData(Key.Escape, 7)]
     public async Task EditKeys_PendingText_CommitsOrCancels(Key key, int expectedHour)
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-GB", "HH:mm");
             var control = new TimeUpDown { TimeValue = new TimeSpan(7, 5, 0) };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
             Input(control).Text = "21:05";
 
             // Act
-            var args = WpfTestHelper.PressKey(Input(control), key);
+            var handled = AvaloniaTestHelper.PressKey(window, key);
 
             // Assert
-            args.Handled.Should().BeTrue();
+            handled.Should().BeTrue();
             control.TimeValue.Should().Be(new TimeSpan(expectedHour, 5, 0));
             Input(control).Text.Should().Be($"{expectedHour:D2}:05");
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public async Task TypingMode_TypedText_KeepsCaretNavigationUntilCommitted()
+    {
+        await AvaloniaTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            SetCulture("en-GB", "HH:mm");
+            var control = new TimeUpDown { TimeValue = new TimeSpan(7, 5, 0) };
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+            Focus(control);
+            var input = Input(control);
+            input.SelectAll();
+            window.KeyTextInput("21:30");
+
+            // Act
+            AvaloniaTestHelper.PressKey(window, Key.Left);
+            var caretAfterLeft = input.CaretIndex;
+            var textAfterLeft = input.Text;
+            AvaloniaTestHelper.PressKey(window, Key.Enter);
+            var selectionAfterCommit = input.SelectedText;
+            AvaloniaTestHelper.PressKey(window, Key.Right);
+
+            // Assert
+            caretAfterLeft.Should().Be(4);
+            textAfterLeft.Should().Be("21:30");
+            control.TimeValue.Should().Be(new TimeSpan(21, 30, 0));
+            selectionAfterCommit.Should().Be("21");
+            input.SelectedText.Should().Be("30");
+            window.Close();
         });
     }
 
     [Fact]
     public async Task CommitEdit_TwoWayBoundValue_PreservesBindingAndUpdatesSource()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-GB", "HH:mm");
             var source = new TimeUpDown { TimeValue = new TimeSpan(7, 5, 0) };
             var control = new TimeUpDown();
-            BindingOperations.SetBinding(
-                control,
+            control.Bind(
                 TimeUpDown.TimeValueProperty,
-                new Binding(nameof(TimeUpDown.TimeValue)) { Source = source });
+                new Binding(nameof(TimeUpDown.TimeValue))
+                {
+                    Source = source,
+                    Mode = BindingMode.TwoWay
+                });
             Input(control).Text = "21:45";
 
             // Act
             var committed = control.CommitEdit();
+            var sourceAfterCommit = source.TimeValue;
+            source.TimeValue = new TimeSpan(6, 0, 0);
 
             // Assert
             committed.Should().BeTrue();
-            BindingOperations.IsDataBound(control, TimeUpDown.TimeValueProperty).Should().BeTrue();
-            source.TimeValue.Should().Be(new TimeSpan(21, 45, 0));
+            sourceAfterCommit.Should().Be(new TimeSpan(21, 45, 0));
+            control.TimeValue.Should().Be(new TimeSpan(6, 0, 0));
+            Input(control).Text.Should().Be("06:00");
         });
     }
 
     [Fact]
-    public async Task LostKeyboardFocus_PendingEdit_CommitsValue()
+    public async Task LostFocus_PendingEdit_CommitsValue()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             SetCulture("en-GB", "HH:mm");
             var control = new TimeUpDown();
-            var input = Input(control);
-            input.Text = "21:45";
+            var window = ShowWithNeighbor(control, out var other);
+            Focus(control);
+            Input(control).Text = "21:45";
 
             // Act
-            input.RaiseEvent(
-                new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice, 0, input, null)
-                {
-                    RoutedEvent = Keyboard.LostKeyboardFocusEvent
-                });
+            other.Focus();
 
             // Assert
             control.TimeValue.Should().Be(new TimeSpan(21, 45, 0));
+            window.Close();
         });
     }
 
     [Fact]
     public async Task MouseWheel_WithoutKeyboardFocus_DoesNotChangeValueOrConsumeScroll()
     {
-        await WpfTestHelper.RunAsync(() =>
+        await AvaloniaTestHelper.RunAsync(() =>
         {
             // Arrange
             var control = new TimeUpDown { TimeValue = new TimeSpan(7, 5, 0) };
-            var args = new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, 120)
-            {
-                RoutedEvent = Mouse.PreviewMouseWheelEvent
-            };
+            var window = ShowWithNeighbor(control, out var other);
+            other.Focus();
 
             // Act
-            control.RaiseEvent(args);
+            var handled = WheelOver(window, control);
 
             // Assert
             control.TimeValue.Should().Be(new TimeSpan(7, 5, 0));
-            args.Handled.Should().BeFalse();
+            handled.Should().BeFalse();
+            window.Close();
         });
-    }
-
-    private static TextBox Input(TimeUpDown control)
-    {
-        return (TextBox)control.FindName("ValueTextBox")!;
     }
 
     private static void SetCulture(string name, string shortTimePattern)

@@ -112,11 +112,13 @@
                         <StackPanel x:Name="ScheduleOptions">
                             <RadioButton x:Name="ManualModeRadio"
                                          Content="_Never (manual only)"
+                                         AutomationProperties.Name="Never (manual only)"
                                          GroupName="Schedule"
                                          IsCheckedChanged="ScheduleMode_CheckedChanged"
                                          Margin="0,0,0,4" />
                             <RadioButton x:Name="SunsetModeRadio"
                                          Content="S_unset to sunrise"
+                                         AutomationProperties.Name="Sunset to sunrise"
                                          GroupName="Schedule"
                                          IsCheckedChanged="ScheduleMode_CheckedChanged"
                                          Margin="0,0,0,4" />
@@ -126,6 +128,7 @@
                                        Margin="22,0,0,12" />
                             <RadioButton x:Name="CustomModeRadio"
                                          Content="Set _hours"
+                                         AutomationProperties.Name="Set hours"
                                          GroupName="Schedule"
                                          IsCheckedChanged="ScheduleMode_CheckedChanged"
                                          Margin="0,0,0,8" />
@@ -204,6 +207,7 @@
                               Grid.Column="0"
                               Grid.ColumnSpan="2"
                               Content="Start _automatically when I sign in"
+                              AutomationProperties.Name="Start automatically when I sign in"
                               Margin="0,16,0,0" />
                 </Grid>
             </Grid>
@@ -226,9 +230,10 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center">
-                <Button Content="_Cancel" IsCancel="True" Click="CancelButton_Click" Margin="0,0,10,0" />
+                <Button Content="_Cancel" AutomationProperties.Name="Cancel" IsCancel="True" Click="CancelButton_Click" Margin="0,0,10,0" />
                 <Button x:Name="SaveButton"
                         Content="_Save"
+                        AutomationProperties.Name="Save"
                         IsDefault="True"
                         Click="SaveButton_Click"
                         Classes="accent" />

@@ -37,7 +37,8 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         LoadSettings(controller.CurrentSettings);
         ScheduleOptions.AddHandler(KeyDownEvent, ScheduleOptions_KeyDown, RoutingStrategies.Tunnel);
-        CustomTimePanel.AddHandler(TextBox.TextChangedEvent, ScheduleTimes_TextChanged);
+        // TextChanging is synchronous; TextChanged is posted and would arrive after programmatic updates finish.
+        CustomTimePanel.AddHandler(TextBox.TextChangingEvent, ScheduleTimes_TextChanging);
         controller.GammaErrorChanged += Controller_GammaErrorChanged;
         Opened += MainWindow_Opened;
         Closed += MainWindow_Closed;
@@ -324,7 +325,7 @@ public sealed partial class MainWindow : Window
         return false;
     }
 
-    private void ScheduleTimes_TextChanged(object? sender, TextChangedEventArgs e)
+    private void ScheduleTimes_TextChanging(object? sender, TextChangingEventArgs e)
     {
         if (_initialized)
         {

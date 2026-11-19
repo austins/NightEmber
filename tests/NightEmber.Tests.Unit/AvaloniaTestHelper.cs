@@ -1,6 +1,10 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using System.Globalization;
 
 namespace NightEmber.Tests.Unit;
 
@@ -29,7 +33,23 @@ internal static class AvaloniaTestHelper
     /// </remarks>
     public static Task RunAsync(Action action)
     {
-        return Session.Value.Dispatch(action, CancellationToken.None);
+        // The session reuses one UI thread, so tests that change the culture must not leak it to later tests.
+        return Session.Value.Dispatch(
+            () =>
+            {
+                var culture = CultureInfo.CurrentCulture;
+                var uiCulture = CultureInfo.CurrentUICulture;
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    CultureInfo.CurrentCulture = culture;
+                    CultureInfo.CurrentUICulture = uiCulture;
+                }
+            },
+            CancellationToken.None);
     }
 
     /// <summary>
@@ -38,6 +58,92 @@ internal static class AvaloniaTestHelper
     public static void FlushDispatcher()
     {
         Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>
+    /// Shows a window and processes the queued activation so keyboard focus and layout are available.
+    /// </summary>
+    /// <param name="window">The window to show.</param>
+    public static void Show(Window window)
+    {
+        window.Show();
+        FlushDispatcher();
+        window.UpdateLayout();
+    }
+
+    /// <summary>
+    /// Shows a control as the only content of a new window.
+    /// </summary>
+    /// <param name="content">The control to host.</param>
+    /// <returns>The shown window; the caller closes it.</returns>
+    public static Window ShowInWindow(Control content)
+    {
+        var window = new Window
+        {
+            Width = 400,
+            Height = 300,
+            Content = content
+        };
+        Show(window);
+        return window;
+    }
+
+    /// <summary>
+    /// Presses and releases a key in the window, routing it to the focused element.
+    /// </summary>
+    /// <param name="window">The window that receives the key.</param>
+    /// <param name="key">The key to press.</param>
+    /// <param name="modifiers">The modifier keys held during the press.</param>
+    /// <returns>Whether a handler marked the key-down event as handled by the time it reached the window.</returns>
+    /// <remarks>The release is skipped when the key press closed the window.</remarks>
+    public static bool PressKey(TopLevel window, Key key, KeyModifiers modifiers = KeyModifiers.None)
+    {
+        var handled = false;
+        void Capture(object? sender, KeyEventArgs e)
+        {
+            handled = e.Handled;
+        }
+
+        window.AddHandler(InputElement.KeyDownEvent, Capture, RoutingStrategies.Bubble, handledEventsToo: true);
+        try
+        {
+            var closed = WatchClosed(window);
+            window.KeyPress(key, (RawInputModifiers)modifiers, PhysicalKey.None, null);
+            if (!closed())
+            {
+                window.KeyRelease(key, (RawInputModifiers)modifiers, PhysicalKey.None, null);
+            }
+        }
+        finally
+        {
+            window.RemoveHandler(InputElement.KeyDownEvent, Capture);
+        }
+
+        return handled;
+    }
+
+    /// <summary>
+    /// Presses Alt plus a letter, the way a user triggers an access key.
+    /// </summary>
+    /// <param name="window">The window that receives the key.</param>
+    /// <param name="letter">The access key letter, A to Z.</param>
+    /// <remarks>The release is skipped when the access key closed the window.</remarks>
+    public static void PressAccessKey(TopLevel window, char letter)
+    {
+        var physicalKey = Enum.Parse<PhysicalKey>(char.ToUpperInvariant(letter).ToString());
+        var closed = WatchClosed(window);
+        window.KeyPressQwerty(physicalKey, RawInputModifiers.Alt);
+        if (!closed())
+        {
+            window.KeyReleaseQwerty(physicalKey, RawInputModifiers.Alt);
+        }
+    }
+
+    private static Func<bool> WatchClosed(TopLevel window)
+    {
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        return () => closed;
     }
 
     /// <summary>
