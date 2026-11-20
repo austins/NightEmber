@@ -34,6 +34,8 @@ internal static class Program
     {
         return AppBuilder.Configure<App>()
             .UseWin32()
+            // The settings window is simple enough for software rendering, which lets the publish drop ANGLE.
+            .With(new Win32PlatformOptions { RenderingMode = [Win32RenderingMode.Software] })
             .UseSkia()
             .UseHarfBuzz();
     }
