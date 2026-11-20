@@ -31,3 +31,5 @@ change.
 - The XAML previewer needs `Program.BuildAvaloniaApp` and the parameterless `MainWindow` constructor.
 - Publish is trimmed. Settings JSON uses the source-generated `SettingsJsonContext` and COM uses
   `[GeneratedComInterface]`, because reflection-based JSON and built-in COM (so `dynamic` COM) are unavailable.
+- Publish is single-file, not Native AOT. AOT cannot embed the SkiaSharp and HarfBuzz native DLLs, so they would ship
+  beside the exe and release downloads would no longer be one file.
