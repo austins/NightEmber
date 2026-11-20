@@ -15,6 +15,27 @@ public sealed class SpinnerAccessibilityTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Input_ArrowButtons_ExposeIncreaseAndDecreaseNames(bool timeInput)
+    {
+        await AvaloniaTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            UserControl control = timeInput ? new TimeUpDown() : new NumericUpDown();
+            var window = AvaloniaTestHelper.ShowInWindow(control);
+
+            // Act
+            var names = (from increase in (bool[])[true, false]
+                select ControlAutomationPeer.CreatePeerForElement(ArrowButton(control, increase)).GetName()).ToArray();
+
+            // Assert
+            names.Should().Equal("Increase", "Decrease");
+            window.Close();
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Input_AccessibilityProperties_ExposeLabelHelpShortcutAndValue(bool timeInput)
     {
         await AvaloniaTestHelper.RunAsync(() =>

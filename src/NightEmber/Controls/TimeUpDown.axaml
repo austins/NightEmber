@@ -4,6 +4,14 @@
              MinWidth="100"
              Focusable="True"
              IsTabStop="False">
+    <UserControl.Styles>
+        <Style Selector="ButtonSpinner /template/ RepeatButton#PART_IncreaseButton">
+            <Setter Property="AutomationProperties.Name" Value="Increase" />
+        </Style>
+        <Style Selector="ButtonSpinner /template/ RepeatButton#PART_DecreaseButton">
+            <Setter Property="AutomationProperties.Name" Value="Decrease" />
+        </Style>
+    </UserControl.Styles>
     <ButtonSpinner x:Name="Spinner"
                    IsTabStop="False"
                    Padding="0"
@@ -16,6 +24,7 @@
                  BorderBrush="Transparent"
                  Margin="-1"
                  MinWidth="0"
+                 Padding="4,0"
                  AcceptsReturn="False"
                  TextWrapping="NoWrap" />
     </ButtonSpinner>

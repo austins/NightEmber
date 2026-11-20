@@ -41,7 +41,8 @@ public sealed partial class App : Application, IDisposable
         // Headless test sessions create this application without a desktop lifetime and skip startup.
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            Start(desktop);
+            // Start can show a modal warning, so run it inside the main loop rather than before it.
+            Dispatcher.UIThread.Post(() => Start(desktop));
         }
     }
 
@@ -59,8 +60,7 @@ public sealed partial class App : Application, IDisposable
                 SingleInstanceService.SignalPrimaryInstance();
             }
 
-            // The main loop has not started yet, so shut down from inside it.
-            Dispatcher.UIThread.Post(() => desktop.Shutdown());
+            desktop.Shutdown();
             return;
         }
 

@@ -183,13 +183,14 @@ public sealed partial class NumericUpDown : UserControl
 
     private void ChangeValue(int direction)
     {
+        // The arrow button takes focus when clicked, so return it to the editor even when the edit is invalid.
+        ValueTextBox.Focus();
         if (!CommitEdit())
         {
             return;
         }
 
         SetCurrentValue(NumericValueProperty, Math.Clamp(NumericValue + direction * Increment, Minimum, Maximum));
-        ValueTextBox.Focus();
         ValueTextBox.SelectAll();
     }
 

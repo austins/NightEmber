@@ -317,6 +317,44 @@ public sealed class MainWindowTests
         });
     }
 
+    [Theory]
+    [InlineData("en-US")]
+    [InlineData("de-DE")]
+    public async Task Show_MinimumWidth_SpinnerValuesFitTheirEditors(string culture)
+    {
+        await AvaloniaTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+            using var fixture = new AppControllerTests.ControllerFixture();
+            var window = new MainWindow(fixture.Controller) { Width = 460 };
+            AvaloniaTestHelper.Show(window);
+            Find<RadioButton>(window, "CustomModeRadio").IsChecked = true;
+            Find<TimeUpDown>(window, "CustomOnInput").TimeValue = TimeSpan.FromHours(12);
+            Find<TimeUpDown>(window, "CustomOffInput").TimeValue = TimeSpan.FromHours(21);
+            Find<NumericUpDown>(window, "FadeDurationInput").NumericValue = 5000;
+            window.UpdateLayout();
+            var editors = new UserControl[]
+            {
+                Find<TimeUpDown>(window, "CustomOnInput"),
+                Find<TimeUpDown>(window, "CustomOffInput"),
+                Find<NumericUpDown>(window, "FadeDurationInput")
+            }.Select(Input);
+
+            // Act
+            var slack = editors
+                .Select(editor => editor.GetVisualDescendants().OfType<ScrollViewer>().Single())
+                .Select(scroller => scroller.Viewport.Width - scroller.Extent.Width)
+                .ToArray();
+
+            // Assert
+            slack.Should().AllSatisfy(static value => value.Should().BeGreaterThanOrEqualTo(0));
+            var page = window.GetVisualDescendants().OfType<ScrollViewer>().First();
+            page.Extent.Width.Should().BeLessThanOrEqualTo(page.Viewport.Width);
+            window.Close();
+        });
+    }
+
     [Fact]
     public async Task Automation_FocusableInputs_ExposeNameHelpAndAccessKey()
     {

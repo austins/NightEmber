@@ -1,5 +1,6 @@
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using NightEmber.Controls;
@@ -214,6 +215,40 @@ public sealed class SpinnerValidationTests
                 .Where(static text => text.IsVisible && !string.IsNullOrEmpty(text.Text))
                 .Should()
                 .BeEmpty("the settings window shows the message, so the control only draws the outline");
+            window.Close();
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ArrowClick_InvalidEdit_KeepsEditorFocusSoEscapeRevertsInsteadOfCancelling(bool timeInput)
+    {
+        await AvaloniaTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            var control = CreateInput(timeInput);
+            var cancelled = false;
+            var cancel = new Button { Content = "Cancel", IsCancel = true };
+            cancel.Click += (_, _) => cancelled = true;
+            var panel = new StackPanel();
+            panel.Children.Add(control);
+            panel.Children.Add(cancel);
+            var window = AvaloniaTestHelper.ShowInWindow(panel);
+            Focus(control);
+            var input = Input(control);
+            input.Text = "invalid";
+            var arrow = ArrowButton(control, true);
+
+            // Act
+            window.MouseDown(Center(arrow, window), MouseButton.Left);
+            window.MouseUp(Center(arrow, window), MouseButton.Left);
+            AvaloniaTestHelper.PressKey(window, Key.Escape);
+
+            // Assert
+            input.Text.Should().Be(timeInput ? "21:00" : "300");
+            HasError(control).Should().BeFalse();
+            cancelled.Should().BeFalse();
             window.Close();
         });
     }

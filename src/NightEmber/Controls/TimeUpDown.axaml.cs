@@ -230,6 +230,8 @@ public sealed partial class TimeUpDown : UserControl
 
     private void ChangeValue(int direction)
     {
+        // The arrow button takes focus when clicked, so return it to the editor even when the edit is invalid.
+        ValueTextBox.Focus();
         if (!CommitEdit())
         {
             return;
@@ -244,7 +246,6 @@ public sealed partial class TimeUpDown : UserControl
         };
 
         SetCurrentValue(TimeValueProperty, TimeValue + adjustment);
-        ValueTextBox.Focus();
         SelectSegment(_selectedSegment);
     }
 
