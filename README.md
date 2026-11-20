@@ -3,8 +3,7 @@
 Night Ember is a portable night-light application for Windows. It applies a warm color temperature directly through each
 display's gamma ramp and runs in the system tray.
 
-<img width="512" height="760" alt="Night Ember settings" src="https://github.com/user-attachments/assets/b94e9c10-13b0-4064-8588-81a04fb1773a" />
-
+<img width="512" height="813" alt="Night Ember settings" src="https://github.com/user-attachments/assets/709c31e8-90c3-4fce-b6aa-2d73146271d2" />
 ## Features
 
 * Adjustable warmth from 6500 K down to 1900 K
