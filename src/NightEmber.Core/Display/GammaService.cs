@@ -113,12 +113,12 @@ public sealed class GammaService : IGammaService
         return applied;
     }
 
-    public void RepairDrift()
+    public bool RepairDrift()
     {
         ThrowIfDisposed();
         if (_expectedBlue is null || _displays.Count == 0)
         {
-            return;
+            return true;
         }
 
         foreach (var display in _displays)
@@ -131,10 +131,11 @@ public sealed class GammaService : IGammaService
             var actualBlue = _readbackBuffer[2 * GammaRampBuilder.RampLength + RampMidpointIndex];
             if (HasDrifted(_expectedBlue.Value, actualBlue))
             {
-                Apply(_lastKelvin, _lastBrightness);
-                return;
+                return Apply(_lastKelvin, _lastBrightness);
             }
         }
+
+        return true;
     }
 
     /// <summary>
@@ -274,11 +275,14 @@ public interface IGammaService : IDisposable
     /// <summary>
     /// Detects whether another component replaced the active ramp and reapplies it.
     /// </summary>
+    /// <returns>
+    /// <see langword="false" /> when drift was detected and the reapply was rejected; otherwise <see langword="true" />.
+    /// </returns>
     /// <remarks>
     /// Only the midpoint of the blue channel is read because a reset changes it by
     /// thousands of units while ordinary driver rounding differs by only a few.
     /// </remarks>
-    public void RepairDrift();
+    public bool RepairDrift();
 
     /// <summary>
     /// Opens each current display independently and attempts to restore an identity ramp.

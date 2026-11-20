@@ -173,6 +173,53 @@ public sealed class GammaServiceTests
         devices.Writes.Select(static write => write.Handle).Should().Equal(1, 2);
     }
 
+    [Fact]
+    public void RepairDrift_DriftedAndReapplyRejected_ReturnsFalse()
+    {
+        // Arrange
+        var devices = new FakeDevices();
+        using var service = new GammaService(devices);
+        service.Apply(3400, 80);
+        devices.Reads.Enqueue((true, 0));
+        for (var index = 0; index < 8; index++)
+        {
+            devices.WriteResults.Enqueue(false);
+        }
+
+        // Act
+        var repaired = service.RepairDrift();
+
+        // Assert
+        repaired.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RepairDrift_ReopenFailsAfterRejectedReapply_ThrowsThenApplyRecovers()
+    {
+        // Arrange
+        var devices = new FakeDevices();
+        using var service = new GammaService(devices);
+        service.Apply(3400, 80);
+        devices.Reads.Enqueue((true, 0));
+        for (var index = 0; index < 4; index++)
+        {
+            devices.WriteResults.Enqueue(false);
+        }
+
+        devices.OpenResults.Enqueue(0);
+        devices.OpenResults.Enqueue(0);
+
+        // Act
+        var thrown = Record.Exception(() => service.RepairDrift());
+        var emptyRepair = service.RepairDrift();
+        var applied = service.Apply(3400, 80);
+
+        // Assert
+        thrown.Should().BeOfType<System.ComponentModel.Win32Exception>();
+        emptyRepair.Should().BeTrue();
+        applied.Should().BeTrue();
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -288,7 +335,7 @@ public sealed class GammaServiceTests
         service.OpenDisplays();
         Action[] operations =
         [
-            service.OpenDisplays, () => service.Apply(3400, 80), () => service.Reset(), service.RepairDrift
+            service.OpenDisplays, () => service.Apply(3400, 80), () => service.Reset(), () => service.RepairDrift()
         ];
 
         // Act

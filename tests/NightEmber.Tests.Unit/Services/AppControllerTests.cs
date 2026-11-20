@@ -401,7 +401,50 @@ public sealed class AppControllerTests
 
         // Assert
         repair.Should().Throw<IOException>().WithMessage("unrelated");
-        fixture.Events.Count(static entry => entry == "repair").Should().Be(3);
+        fixture.Events.Count(static entry => entry == "repair").Should().Be(2);
+    }
+
+    [Fact]
+    public void RepairGammaDrift_RepairRejected_ShowsErrorAndRetriesUntilApplySucceeds()
+    {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Controller.UpdateSchedule(true);
+        var drift = fixture.Runtime.Timers[1];
+        fixture.Gamma.RepairResult = false;
+        fixture.Events.Clear();
+
+        // Act
+        drift.Fire();
+        var afterRejection = fixture.Controller.GammaError;
+        drift.Fire();
+
+        // Assert
+        afterRejection.Should().Be("The display driver rejected the requested gamma ramp.");
+        fixture.Events.Should().Equal("repair", "apply");
+        fixture.Controller.GammaError.Should().BeNull();
+    }
+
+    [Fact]
+    public void RepairGammaDrift_RepairThrows_RetriesApplyAndClearsError()
+    {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Controller.UpdateSchedule(true);
+        var drift = fixture.Runtime.Timers[1];
+        fixture.Gamma.RepairException = new System.ComponentModel.Win32Exception("display lost");
+        fixture.Events.Clear();
+
+        // Act
+        drift.Fire();
+        var afterFailure = fixture.Controller.GammaError;
+        fixture.Gamma.RepairException = null;
+        drift.Fire();
+
+        // Assert
+        afterFailure.Should().Be("display lost");
+        fixture.Events.Should().Equal("repair", "apply");
+        fixture.Controller.GammaError.Should().BeNull();
     }
 
     [Fact]
@@ -905,6 +948,8 @@ public sealed class AppControllerTests
 
         public bool ResetResult { get; set; } = true;
 
+        public bool RepairResult { get; set; } = true;
+
         public void OpenDisplays()
         {
             events.Add("open");
@@ -937,13 +982,15 @@ public sealed class AppControllerTests
             return ResetResult;
         }
 
-        public void RepairDrift()
+        public bool RepairDrift()
         {
             events.Add("repair");
             if (RepairException is not null)
             {
                 throw RepairException;
             }
+
+            return RepairResult;
         }
 
         public void ResetAll()

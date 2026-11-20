@@ -516,10 +516,16 @@ internal sealed class AppController : IDisposable
 
         try
         {
-            _gammaService.RepairDrift();
+            if (!_gammaService.RepairDrift())
+            {
+                _gammaRetryNeeded = true;
+                SetGammaError("The display driver rejected the requested gamma ramp.");
+            }
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
+            // The display list may be empty now; the retry path reopens it.
+            _gammaRetryNeeded = true;
             SetGammaError(ex.Message);
         }
     }
