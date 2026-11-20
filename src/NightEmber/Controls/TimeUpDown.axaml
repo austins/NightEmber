@@ -25,6 +25,7 @@
                  Margin="-1"
                  MinWidth="0"
                  Padding="4,0"
+                 VerticalContentAlignment="Center"
                  AcceptsReturn="False"
                  TextWrapping="NoWrap" />
     </ButtonSpinner>
