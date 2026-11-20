@@ -174,6 +174,7 @@
                                            IsVisible="{Binding ErrorMessage, ElementName=CustomOffInput, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                 <TextBlock x:Name="ScheduleErrorText"
                                            Classes="inputError"
+                                           Margin="0"
                                            AutomationProperties.LiveSetting="Assertive" />
                             </StackPanel>
                         </Grid>

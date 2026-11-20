@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -26,6 +28,7 @@ public sealed partial class MainWindow : Window
     private bool _saved;
     private bool _showScheduleValidation;
     private bool _previewPending;
+    private string _offHelpText = string.Empty;
 
     /// <summary>
     /// Initializes the window for the XAML previewer only; the app always passes a controller.
@@ -44,6 +47,7 @@ public sealed partial class MainWindow : Window
     {
         _controller = controller;
         InitializeComponent();
+        _offHelpText = AutomationProperties.GetHelpText(CustomOffInput) ?? string.Empty;
         LoadSettings(controller.CurrentSettings);
         ScheduleOptions.AddHandler(KeyDownEvent, ScheduleOptions_KeyDown, RoutingStrategies.Tunnel);
         // TextChanging is synchronous; TextChanged is posted and would arrive after programmatic updates finish.
@@ -349,10 +353,17 @@ public sealed partial class MainWindow : Window
                       && CustomOnInput.TryGetEditedTime(out var on)
                       && CustomOffInput.TryGetEditedTime(out var off)
                       && !IsCustomWindowValid(on, off);
-        ScheduleErrorText.Text = invalid
+        var message = invalid
             ? "Set different turn-on and turn-off times. Matching times would never turn Night Ember on."
             : string.Empty;
-        ScheduleErrorText.IsVisible = invalid;
+        // The element stays visible (zero height when empty) so its automation peer exists and
+        // the first text change is announced; a peer created at the same time as the text may not be.
+        ScheduleErrorText.Text = message;
+        ScheduleErrorText.Margin = invalid ? new Thickness(0, 4, 0, 0) : default;
+        // Save focuses the turn-off editor, so the error must also be exposed there.
+        AutomationProperties.SetHelpText(
+            CustomOffInput,
+            invalid ? $"{message} {_offHelpText}" : _offHelpText);
         return !invalid;
     }
 }

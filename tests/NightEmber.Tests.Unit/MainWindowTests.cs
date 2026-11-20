@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -597,6 +598,36 @@ public sealed class MainWindowTests
             correctedMessage.Should().BeEmpty();
             fixture.Runtime.Saved.Should().NotBeNull();
             fixture.Runtime.Saved.CustomOff.Should().Be("07:00");
+        });
+    }
+
+    [Fact]
+    public async Task Save_MatchingScheduleTimes_ExposesErrorOnFocusedEditorAndLiveRegionUntilCorrected()
+    {
+        await WithWindow((window, _) =>
+        {
+            // Arrange
+            var input = Input(Find<TimeUpDown>(window, "CustomOffInput"));
+            var error = Find<TextBlock>(window, "ScheduleErrorText");
+            var liveRegionVisibleBeforeError = error.IsVisible;
+            input.Text = "21:00";
+
+            // Act
+            Save(window);
+            var peer = ControlAutomationPeer.CreatePeerForElement((Control)Focused(window)!);
+            var helpWithError = peer.GetHelpText();
+            var errorLiveSetting = ControlAutomationPeer.CreatePeerForElement(error).GetLiveSetting();
+            input.Text = "07:00";
+            var helpCorrected = ControlAutomationPeer.CreatePeerForElement(input).GetHelpText();
+
+            // Assert
+            liveRegionVisibleBeforeError.Should().BeTrue();
+            error.IsEffectivelyVisible.Should().BeTrue();
+            Focused(window).Should().BeSameAs(input);
+            helpWithError.Should().Contain("Set different turn-on and turn-off times");
+            errorLiveSetting.Should().Be(AutomationLiveSetting.Assertive);
+            helpCorrected.Should().NotContain("Set different");
+            helpCorrected.Should().Contain("Turn-off time");
         });
     }
 
