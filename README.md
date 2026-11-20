@@ -18,7 +18,7 @@ display's gamma ramp and runs in the system tray.
 * Schedule updates when the Windows time or time zone changes
 * Gamma drift detection when another program resets a display
 * Tray toggle, settings window, and optional sign-in startup
-* Settings and tray-menu styling that follows the Windows light or dark app theme
+* Settings and tray-menu styling that follows the Windows light or dark app theme and high-contrast themes
 * One instance per Windows session; launching it again opens the running copy's settings
 * A cleanup watchdog that restores neutral gamma after an unexpected process exit
 * Portable settings stored beside the executable
