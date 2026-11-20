@@ -61,12 +61,12 @@ public sealed class SpinnerValidationTests
 
             // Act
             other.Focus();
-            var committedAgain = Commit(control);
 
             // Assert
             errorBeforeCommit.Should().BeFalse();
             input.Text.Should().Be("invalid");
-            committedAgain.Should().BeFalse();
+            other.IsFocused.Should().BeTrue();
+            input.IsFocused.Should().BeFalse();
             HasError(control).Should().BeTrue();
             AutomationProperties.GetItemStatus(input).Should().Be(ErrorMessage(control));
             AutomationProperties.GetItemStatus(input).Should().NotBeNullOrWhiteSpace();

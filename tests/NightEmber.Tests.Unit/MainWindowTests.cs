@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
@@ -380,6 +381,37 @@ public sealed class MainWindowTests
             slack.Should().AllSatisfy(static value => value.Should().BeGreaterThanOrEqualTo(0));
             var page = window.GetVisualDescendants().OfType<ScrollViewer>().First();
             page.Extent.Width.Should().BeLessThanOrEqualTo(page.Viewport.Width);
+            window.Close();
+        });
+    }
+
+    [Theory]
+    [InlineData("en-US", "CustomOnInput")]
+    [InlineData("en-US", "CustomOffInput")]
+    [InlineData("de-DE", "CustomOnInput")]
+    [InlineData("de-DE", "CustomOffInput")]
+    public async Task Show_MinimumWidth_CustomTimeEditorStaysInsideViewport(string culture, string editorName)
+    {
+        await AvaloniaTestHelper.RunAsync(() =>
+        {
+            // Arrange
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+            using var fixture = new AppControllerTests.ControllerFixture();
+            var window = new MainWindow(fixture.Controller) { Width = 460 };
+            AvaloniaTestHelper.Show(window);
+            AvaloniaTestHelper.FlushDispatcher();
+            Find<RadioButton>(window, "CustomModeRadio").IsChecked = true;
+            window.UpdateLayout();
+            var page = window.GetVisualDescendants().OfType<ScrollViewer>().First();
+            var editor = Find<TimeUpDown>(window, editorName);
+
+            // Act
+            var left = editor.TranslatePoint(new Point(0, 0), page)?.X ?? double.NaN;
+            var right = left + editor.Bounds.Width;
+
+            // Assert
+            left.Should().BeGreaterThanOrEqualTo(0);
+            right.Should().BeLessThanOrEqualTo(page.Viewport.Width);
             window.Close();
         });
     }

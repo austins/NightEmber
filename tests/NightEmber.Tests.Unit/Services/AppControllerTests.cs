@@ -426,6 +426,26 @@ public sealed class AppControllerTests
     }
 
     [Fact]
+    public void RepairGammaDrift_PreviewRejected_RetriesPreviewValuesAndStopsMonitoring()
+    {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        var drift = fixture.Runtime.Timers[1];
+        fixture.Gamma.ApplyResults.Enqueue(false);
+        fixture.Controller.Preview(4000, 80);
+        var afterRejection = fixture.Controller.GammaError;
+
+        // Act
+        drift.Fire();
+
+        // Assert
+        afterRejection.Should().NotBeNull();
+        fixture.Gamma.Applied.Should().Equal((4000d, 80d), (4000d, 80d));
+        fixture.Controller.GammaError.Should().BeNull();
+        drift.IsRunning.Should().BeFalse();
+    }
+
+    [Fact]
     public void RepairGammaDrift_RepairThrows_RetriesApplyAndClearsError()
     {
         // Arrange

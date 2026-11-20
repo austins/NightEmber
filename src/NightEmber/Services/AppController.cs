@@ -494,8 +494,20 @@ internal sealed class AppController : IDisposable
 
     private void RepairGammaDrift()
     {
-        if (_previewing || _fadeTimer is not null || IsExiting)
+        if (_fadeTimer is not null || IsExiting)
         {
+            return;
+        }
+
+        if (_previewing)
+        {
+            // Retry a rejected preview write with the preview values, never the scheduled target.
+            if (_gammaRetryNeeded)
+            {
+                ApplyGamma(_previewTemperature, _previewBrightness);
+                UpdateDriftMonitoring();
+            }
+
             return;
         }
 
@@ -537,8 +549,8 @@ internal sealed class AppController : IDisposable
             && (_isOn
                 || (_fadeTimer is null
                     && (_gammaRetryNeeded
-                        || !GammaTransition.StatesMatch(
-                            _currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness)))))
+                        || (!_previewing && !GammaTransition.StatesMatch(
+                            _currentKelvin, _currentBrightness, _targetKelvin, _targetBrightness))))))
         {
             _driftTimer.Start();
         }

@@ -136,7 +136,7 @@
                         <Grid x:Name="CustomTimePanel"
                               Margin="22,0,0,0"
                               RowDefinitions="Auto,Auto"
-                              ColumnDefinitions="Auto,140,22,Auto,140">
+                              ColumnDefinitions="Auto,140,12,Auto,140">
                             <Label x:Name="CustomOnLabel"
                                    Grid.Column="0"
                                    Content="Turn _on"
