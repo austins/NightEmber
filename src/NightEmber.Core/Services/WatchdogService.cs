@@ -17,7 +17,8 @@ public sealed class WatchdogService : IDisposable
     private const string LauncherSwitch = "--watchdog-launcher";
     private const int InvalidArgumentsExitCode = 2;
     private const int LaunchFailedExitCode = 3;
-    private const int LauncherTimeoutMilliseconds = 10_000;
+    // Generous because antivirus can scan a freshly downloaded exe on its first launch.
+    private const int LauncherTimeoutMilliseconds = 30_000;
     private readonly EventWaitHandle _orderlyExitEvent;
     private readonly string _eventName;
     private bool _disposed;
