@@ -16,5 +16,18 @@ change.
 - Name tests `Member_Scenario_Expectation` with `// Arrange`, `// Act`, `// Assert` sections.
 - Assertions come from AwesomeAssertions (`.Should()`), a global using in the test project.
 - Isolate side effects behind internal interfaces with hand-written fakes, as in `AppControllerTests.FakeRuntime`.
-- Wrap WPF object use in `WpfTestHelper.RunAsync`, which supplies the STA thread.
+- Run Avalonia code in tests through `await AvaloniaTestHelper.RunAsync(() => ...)`. It dispatches onto one shared
+  `Avalonia.Headless` UI thread with a fresh `App` per call. Tests stay plain `[Fact]`s because
+  `Avalonia.Headless.XUnit` does not work with xunit v3. Call `AvaloniaTestHelper.FlushDispatcher()` to run queued
+  background work, since the action runs no message loop.
 - Tests run fully in parallel, so each owns its temp files and state.
+
+## Avalonia
+
+- Track text edits with `TextChanging`, which is synchronous. `TextChanged` is posted and arrives after programmatic
+  updates finish.
+- Set `AutomationProperties.Name` explicitly on controls whose content has an access-key underscore; otherwise the
+  underscore leaks into the automation name.
+- The XAML previewer needs `Program.BuildAvaloniaApp` and the parameterless `MainWindow` constructor.
+- Publish is trimmed. Settings JSON uses the source-generated `SettingsJsonContext` and COM uses
+  `[GeneratedComInterface]`, because reflection-based JSON and built-in COM (so `dynamic` COM) are unavailable.

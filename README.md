@@ -58,8 +58,8 @@ In time fields, Left/Right selects the hour, minute, or AM/PM segment and Up/Dow
 5). In the transition field, Up/Down adjusts the duration by 50 milliseconds. Modified arrow keys retain normal
 text-editing behavior. While typing a time, Left/Right moves the caret so you can correct the text; committing a valid
 edit restores segment navigation. Inside these fields, Enter commits the edit and Escape restores it; use Alt+S or Alt+C
-to save or cancel the whole window. Elsewhere, Enter and Escape activate the default Save and Cancel actions when not
-consumed by a control.
+to save or cancel the whole window. Elsewhere, Enter saves and Escape cancels unless the focused control uses the key:
+Enter on a focused button, checkbox, or radio button activates or toggles it instead.
 
 Invalid times and transition durations stay visible when you press Enter or leave the field. A themed error outline and
 inline message explain what needs correcting; Save keeps the window open and focuses the first invalid input. Correct
@@ -67,9 +67,7 @@ the text or press Escape in the field to restore its last accepted value. Transi
 from 0 to 5000 ms. Custom turn-on/off times must differ; unused custom-time fields do not block saving manual or sunset
 schedules.
 
-For the tray icon, press Win+B, then use the arrow keys to select Night Ember (open the hidden-icons area if needed).
-Enter opens settings; Shift+F10 or the context-menu key opens its menu. In the menu, use Up/Down and Enter, or press T
-to toggle the tint, S for settings, and X to exit. Escape dismisses the menu and returns focus to the notification area.
+The tray icon responds only to the mouse; it has no keyboard access.
 
 ## Portable settings
 
@@ -140,8 +138,10 @@ dotnet build .\NightEmber.slnx
 dotnet publish .\src\NightEmber\NightEmber.csproj --configuration Release /p:PublishProfile=win-x64
 ```
 
-The output, `src\NightEmber\bin\publish\win-x64\NightEmber.exe`, bundles the .NET runtime and targets 64-bit Windows,
-so it needs no installer or separate runtime.
+The publish profile (`src\NightEmber\Properties\PublishProfiles\win-x64.pubxml`) produces a trimmed, self-contained,
+single-file, ReadyToRun executable for 64-bit Windows. The output folder, `src\NightEmber\bin\publish\win-x64\`,
+contains only `NightEmber.exe` (about 29.5 MB), which bundles the .NET runtime, so it needs no installer or separate
+runtime. Rendering is software-only, so the ANGLE libraries are not included.
 
 ## Display behavior and cleanup
 
@@ -153,6 +153,10 @@ If the watchdog is also terminated, for example from Task Manager, a tint can re
 
 When Windows begins signing out or shutting down, Night Ember restores neutral gamma and exits. If the sign-out or
 shutdown is then cancelled, start Night Ember again to restore the tint.
+
+When a display rejects a ramp or cannot be opened, Night Ember shows no notification. The error appears as an extra line
+in the tray tooltip and above the Save and Cancel buttons in the settings window, and the next successful apply clears
+it.
 
 If Night Ember crashes, the unhandled error is appended to `NightEmber.log` beside the executable. The log starts over
 once it reaches 1 MB.

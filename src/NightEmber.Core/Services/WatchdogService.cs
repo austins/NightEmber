@@ -48,7 +48,7 @@ public sealed class WatchdogService : IDisposable
     /// </summary>
     /// <remarks>
     /// The watchdog receives the main process ID and a randomly named event. Its entry point
-    /// dispatches to watchdog mode before loading WPF, so it creates no application,
+    /// dispatches to watchdog mode before loading Avalonia, so it creates no application,
     /// settings window, tray icon, or controller. It is started through a short-lived launcher
     /// process so it is not a descendant of the main process; tools that kill a whole process
     /// tree, such as an IDE's stop command, therefore leave it running to restore the displays.
