@@ -304,11 +304,32 @@ public sealed class GammaServiceTests
         var identity = GammaRampBuilder.Build(1, 1, 1, 1, false);
 
         // Act
-        GammaService.ResetAllDisplays(devices);
+        var restored = GammaService.ResetAllDisplays(devices);
 
         // Assert
+        restored.Should().BeTrue();
         devices.Writes.Select(static write => write.Handle).Should().Equal(10, 10, 20, 20);
         devices.Writes.Should().AllSatisfy(write => write.Ramp.Should().Equal(identity));
+        devices.Closed.Should().Equal(10, 20);
+    }
+
+    [Fact]
+    public void ResetAllDisplays_BothWritesRejected_ReportsFailure()
+    {
+        // Arrange
+        var devices = new FakeDevices { Names = ["first", "second"] };
+        devices.OpenResults.Enqueue(10);
+        devices.OpenResults.Enqueue(20);
+        devices.WriteResults.Enqueue(true);
+        devices.WriteResults.Enqueue(true);
+        devices.WriteResults.Enqueue(false);
+        devices.WriteResults.Enqueue(false);
+
+        // Act
+        var restored = GammaService.ResetAllDisplays(devices);
+
+        // Assert
+        restored.Should().BeFalse();
         devices.Closed.Should().Equal(10, 20);
     }
 

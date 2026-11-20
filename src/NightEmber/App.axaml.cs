@@ -28,9 +28,14 @@ public sealed partial class App : Application, IDisposable
     public void Dispose()
     {
         _controller?.Dispose();
+        if (_controller?.NeutralRestoreFailed != true)
+        {
+            // Without the signal, the watchdog treats this like a crash and retries the restore itself.
+            _watchdog?.SignalOrderlyExit();
+        }
+
         _controller = null;
 
-        _watchdog?.SignalOrderlyExit();
         _watchdog?.Dispose();
         _watchdog = null;
 

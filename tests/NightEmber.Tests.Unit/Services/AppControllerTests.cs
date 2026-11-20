@@ -631,6 +631,24 @@ public sealed class AppControllerTests
 
         // Assert
         fixture.Events.Should().Equal("reset", "reset-all", "shutdown");
+        fixture.Controller.NeutralRestoreFailed.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Exit_ResetFallback_ReportsWhetherTheWatchdogMustRetry(bool fallbackRestored, bool expectedFailed)
+    {
+        // Arrange
+        using var fixture = new ControllerFixture();
+        fixture.Gamma.ResetResult = false;
+        fixture.Gamma.ResetAllResult = fallbackRestored;
+
+        // Act
+        fixture.Controller.Exit();
+
+        // Assert
+        fixture.Controller.NeutralRestoreFailed.Should().Be(expectedFailed);
     }
 
     [Fact]
@@ -970,6 +988,8 @@ public sealed class AppControllerTests
 
         public bool RepairResult { get; set; } = true;
 
+        public bool ResetAllResult { get; set; } = true;
+
         public void OpenDisplays()
         {
             events.Add("open");
@@ -1013,13 +1033,15 @@ public sealed class AppControllerTests
             return RepairResult;
         }
 
-        public void ResetAll()
+        public bool ResetAll()
         {
             events.Add("reset-all");
             if (ResetAllException is not null)
             {
                 throw ResetAllException;
             }
+
+            return ResetAllResult;
         }
 
         public void Dispose()

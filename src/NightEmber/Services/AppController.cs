@@ -126,6 +126,11 @@ internal sealed class AppController : IDisposable
     public bool IsStartupEnabled => _runtime.IsStartupEnabled;
 
     /// <summary>
+    /// Gets a value indicating whether the last neutral restore left a display tinted, so the watchdog must retry it.
+    /// </summary>
+    public bool NeutralRestoreFailed { get; private set; }
+
+    /// <summary>
     /// Loads configuration and starts the tray, display, scheduling, and recovery services.
     /// </summary>
     /// <param name="hidden">
@@ -657,37 +662,37 @@ internal sealed class AppController : IDisposable
 
     private void TryResetGamma()
     {
+        var restored = false;
         try
         {
-            if (!_gammaService.Reset())
-            {
-                TryResetAllDisplays();
-            }
+            restored = _gammaService.Reset() || TryResetAllDisplays();
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
-            TryResetAllDisplays();
+            restored = TryResetAllDisplays();
         }
         finally
         {
             // Repeated ramp writes make some drivers re-composite the desktop,
             // so shutdown paths skip a reset that already happened.
             _neutralRestored = true;
+            NeutralRestoreFailed = !restored;
             _currentKelvin = ColorTemperature.NeutralKelvin;
             _currentBrightness = NeutralBrightnessPercent;
         }
     }
 
-    private void TryResetAllDisplays()
+    private bool TryResetAllDisplays()
     {
         try
         {
-            _gammaService.ResetAll();
+            return _gammaService.ResetAll();
         }
         catch (Exception ex) when (IsDisplayException(ex))
         {
             // No display can be enumerated, so there is no remaining ramp to restore.
             Trace.TraceWarning("Could not restore neutral gamma: {0}", ex.Message);
+            return true;
         }
     }
 

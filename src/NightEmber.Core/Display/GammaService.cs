@@ -147,7 +147,7 @@ public sealed class GammaService : IGammaService
     /// </remarks>
     public static void ResetAllDisplays()
     {
-        ResetAllDisplays(new GammaDeviceApi());
+        _ = ResetAllDisplays(new GammaDeviceApi());
     }
 
     /// <summary>
@@ -161,14 +161,15 @@ public sealed class GammaService : IGammaService
         return Math.Abs(actual - expected) > DriftTolerance;
     }
 
-    void IGammaService.ResetAll()
+    bool IGammaService.ResetAll()
     {
-        ResetAllDisplays(_devices);
+        return ResetAllDisplays(_devices);
     }
 
-    internal static void ResetAllDisplays(IGammaDeviceApi devices)
+    internal static bool ResetAllDisplays(IGammaDeviceApi devices)
     {
         var ramp = GammaRampBuilder.Build(1, 1, 1, 1, false);
+        var restored = true;
         foreach (var deviceName in devices.GetDeviceNames())
         {
             var deviceContext = devices.Open(deviceName);
@@ -181,14 +182,16 @@ public sealed class GammaService : IGammaService
             {
                 // Some display drivers intermittently ignore the first identity ramp,
                 // so the watchdog recovery path repeats the reset once.
-                devices.Write(deviceContext, ramp);
-                devices.Write(deviceContext, ramp);
+                var first = devices.Write(deviceContext, ramp);
+                restored &= devices.Write(deviceContext, ramp) || first;
             }
             finally
             {
                 devices.Close(deviceContext);
             }
         }
+
+        return restored;
     }
 
     private void EnsureDisplays()
@@ -290,6 +293,8 @@ public interface IGammaService : IDisposable
     /// <remarks>
     /// Recovery does not depend on tracked display handles. It writes the identity ramp
     /// twice per usable display and releases each newly opened handle afterward.
+    /// Displays that cannot be opened are skipped rather than counted as failures.
     /// </remarks>
-    public void ResetAll();
+    /// <returns><see langword="true" /> when every opened display accepted at least one write.</returns>
+    public bool ResetAll();
 }

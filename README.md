@@ -146,7 +146,7 @@ runtime. Rendering is software-only, so the ANGLE libraries are not included.
 ## Display behavior and cleanup
 
 Gamma ramps outlive the process that sets them, so Night Ember starts a watchdog. If Night Ember ends unexpectedly, the
-watchdog restores every display.
+watchdog restores every display. It also retries when a normal exit could not restore a display.
 
 If the watchdog is also terminated, for example from Task Manager, a tint can remain. Relaunch Night Ember and choose
 **Exit** to restore neutral gamma.
