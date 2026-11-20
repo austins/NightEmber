@@ -26,9 +26,15 @@ internal static class Program
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int RunApplication(string[] args)
     {
+        return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
+    }
+
+    // The XAML previewer finds this method by name.
+    private static AppBuilder BuildAvaloniaApp()
+    {
         return AppBuilder.Configure<App>()
             .UseWin32()
             .UseSkia()
-            .StartWithClassicDesktopLifetime(args, ShutdownMode.OnExplicitShutdown);
+            .UseHarfBuzz();
     }
 }
