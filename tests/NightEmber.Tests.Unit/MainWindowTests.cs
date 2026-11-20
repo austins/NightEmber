@@ -1,6 +1,7 @@
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -319,9 +320,13 @@ public sealed class MainWindowTests
     }
 
     [Theory]
-    [InlineData("en-US")]
-    [InlineData("de-DE")]
-    public async Task Show_MinimumWidth_SpinnerValuesFitTheirEditors(string culture)
+    [InlineData("en-US", 1.0)]
+    [InlineData("en-US", 1.5)]
+    [InlineData("en-US", 2.0)]
+    [InlineData("de-DE", 1.0)]
+    [InlineData("de-DE", 1.5)]
+    [InlineData("de-DE", 2.0)]
+    public async Task Show_MinimumWidth_SpinnerValuesFitTheirEditors(string culture, double scaling)
     {
         await AvaloniaTestHelper.RunAsync(() =>
         {
@@ -330,6 +335,8 @@ public sealed class MainWindowTests
             using var fixture = new AppControllerTests.ControllerFixture();
             var window = new MainWindow(fixture.Controller) { Width = 460 };
             AvaloniaTestHelper.Show(window);
+            window.SetRenderScaling(scaling);
+            AvaloniaTestHelper.FlushDispatcher();
             Find<RadioButton>(window, "CustomModeRadio").IsChecked = true;
             Find<TimeUpDown>(window, "CustomOnInput").TimeValue = TimeSpan.FromHours(12);
             Find<TimeUpDown>(window, "CustomOffInput").TimeValue = TimeSpan.FromHours(21);
@@ -349,6 +356,7 @@ public sealed class MainWindowTests
                 .ToArray();
 
             // Assert
+            window.RenderScaling.Should().Be(scaling);
             slack.Should().AllSatisfy(static value => value.Should().BeGreaterThanOrEqualTo(0));
             var page = window.GetVisualDescendants().OfType<ScrollViewer>().First();
             page.Extent.Width.Should().BeLessThanOrEqualTo(page.Viewport.Width);
