@@ -8,5 +8,4 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\NightEmber\NightEmber.csproj"/>
     </ItemGroup>
-
 </Project>
