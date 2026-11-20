@@ -36,9 +36,12 @@ public sealed class TrayIconServiceTests
             var items = service.NotifyIcon.Menu!.Items;
 
             // Act
+#pragma warning disable CS0618 // Only the implementation assembly marks this unstable; NativeMenuItem has no stable way to raise Click.
             ((INativeMenuItemExporterEventsImplBridge)items[0]).RaiseClicked();
             ((INativeMenuItemExporterEventsImplBridge)items[2]).RaiseClicked();
             ((INativeMenuItemExporterEventsImplBridge)items[4]).RaiseClicked();
+#pragma warning restore CS0618
+
             // Assert
             calls.Should().Equal("toggle", "settings", "exit");
         });
