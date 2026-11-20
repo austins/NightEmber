@@ -31,6 +31,11 @@
         <Style Selector="Button">
             <Setter Property="Padding" Value="18,7" />
             <Setter Property="MinWidth" Value="82" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <!-- Fluent has no right padding here, so the focus rectangle would cover the last letter. -->
+        <Style Selector="CheckBox, RadioButton">
+            <Setter Property="Padding" Value="8,0,4,0" />
         </Style>
         <Style Selector="ButtonSpinner /template/ DataValidationErrors">
             <Setter Property="Theme" Value="{DynamicResource OutlineOnlyDataValidationErrors}" />

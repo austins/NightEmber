@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Platform;
 using Avalonia.VisualTree;
 using NightEmber.Controls;
 using NightEmber.Core.Models;
@@ -229,6 +230,25 @@ public sealed class MainWindowTests
             // Assert
             startup.IsChecked.Should().Be(before != true);
         });
+    }
+
+    [Theory]
+    [InlineData(ColorContrastPreference.High, "#FFFFFF", "#000000")]
+    [InlineData(ColorContrastPreference.High, "#000000", "#FFFFFF")]
+    [InlineData(ColorContrastPreference.NoPreference, "#FFFFFF", null)]
+    public void GetHighContrastAccentForeground_Contrast_ReadsOnTheAccent(
+        ColorContrastPreference contrast,
+        string accent,
+        string? expected)
+    {
+        // Arrange
+        var values = new PlatformColorValues { ContrastPreference = contrast, AccentColor1 = Color.Parse(accent) };
+
+        // Act
+        var foreground = App.GetHighContrastAccentForeground(values);
+
+        // Assert
+        foreground.Should().Be(expected is null ? null : Color.Parse(expected));
     }
 
     [Fact]

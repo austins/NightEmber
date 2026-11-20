@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media;
+using Avalonia.Platform;
 using Avalonia.Threading;
 using NightEmber.Core.Services;
 using NightEmber.Services;
@@ -12,6 +14,13 @@ namespace NightEmber;
 /// </summary>
 public sealed partial class App : Application, IDisposable
 {
+    private static readonly string[] AccentButtonForegroundKeys =
+    [
+        "AccentButtonForeground",
+        "AccentButtonForegroundPointerOver",
+        "AccentButtonForegroundPressed"
+    ];
+
     private SingleInstanceService? _singleInstance;
     private WatchdogService? _watchdog;
     private AppController? _controller;
@@ -32,6 +41,12 @@ public sealed partial class App : Application, IDisposable
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+
+        if (PlatformSettings is { } settings)
+        {
+            UpdateAccentButtonForeground(settings.GetColorValues());
+            settings.ColorValuesChanged += (_, values) => UpdateAccentButtonForeground(values);
+        }
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -43,6 +58,43 @@ public sealed partial class App : Application, IDisposable
         {
             // Start can show a modal warning, so run it inside the main loop rather than before it.
             Dispatcher.UIThread.Post(() => Start(desktop));
+        }
+    }
+
+    /// <summary>
+    /// Picks the text color for accent buttons in high contrast.
+    /// </summary>
+    /// <param name="values">The current platform colors.</param>
+    /// <returns>Black or white, whichever reads better on the system accent color, or null outside high contrast.</returns>
+    /// <remarks>
+    /// The Fluent theme always draws accent button text in white, which is unreadable on the pale accent
+    /// that Windows reports in high contrast.
+    /// </remarks>
+    internal static Color? GetHighContrastAccentForeground(PlatformColorValues values)
+    {
+        if (values.ContrastPreference != ColorContrastPreference.High)
+        {
+            return null;
+        }
+
+        var accent = values.AccentColor1;
+        var luminance = (0.2126 * accent.R) + (0.7152 * accent.G) + (0.0722 * accent.B);
+        return luminance > 127.5 ? Colors.Black : Colors.White;
+    }
+
+    private void UpdateAccentButtonForeground(PlatformColorValues values)
+    {
+        var color = GetHighContrastAccentForeground(values);
+        foreach (var key in AccentButtonForegroundKeys)
+        {
+            if (color is { } foreground)
+            {
+                Resources[key] = new SolidColorBrush(foreground);
+            }
+            else
+            {
+                Resources.Remove(key);
+            }
         }
     }
 
