@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using NightEmber.Controls;
 using static NightEmber.Tests.Unit.Controls.SpinnerTestHelper;
 using NumericUpDown = NightEmber.Controls.NumericUpDown;
@@ -31,7 +32,7 @@ public sealed class SpinnerThemeTests
 
                 // Assert
                 SolidColor(Spinner(control).Background).Should().Be(Resource(window, "TextControlBackground", variant));
-                SolidColor(Spinner(control).BorderBrush).Should().Be(Resource(window, "TextControlBorderBrush", variant));
+                BorderElement(control).BorderBrush.Should().BeSameAs(ResourceValue(window, "TextControlBorderBrush", variant));
                 SolidColor(Input(control).Foreground).Should().Be(Resource(window, "TextControlForeground", variant));
             }
 
@@ -95,27 +96,28 @@ public sealed class SpinnerThemeTests
                 Input(control).Text = "invalid";
                 Commit(control);
                 window.UpdateLayout();
-                var errorBrush = Spinner(control).BorderBrush;
+                var errorBrush = BorderElement(control).BorderBrush;
                 var after = (Spinner(control).Bounds, Input(control).Bounds);
                 control.IsEnabled = false;
                 window.UpdateLayout();
-                var disabledBrush = Spinner(control).BorderBrush;
+                var disabledBrush = BorderElement(control).BorderBrush;
                 control.IsEnabled = true;
 
                 // Assert
-                SolidColor(errorBrush).Should().Be(Resource(window, "InputErrorBrush", variant));
-                SolidColor(disabledBrush).Should().Be(Resource(window, "InputErrorBrush", variant));
+                SolidColor(errorBrush).Should().Be(Resource(window, "SystemFillColorCritical", variant));
+                SolidColor(disabledBrush).Should().Be(Resource(window, "SystemFillColorCritical", variant));
                 after.Should().Be(before);
                 HasError(control).Should().BeTrue();
                 errorColors.Add(SolidColor(errorBrush));
 
-                SolidColor(Spinner(control).BorderBrush).Should().Be(Resource(window, "InputErrorBrush", variant));
                 control.Focus();
                 Input(control).Focus();
+                window.UpdateLayout();
+                SolidColor(BorderElement(control).BorderBrush).Should().Be(Resource(window, "SystemFillColorCritical", variant));
                 AvaloniaTestHelper.PressKey(window, Key.Escape);
                 window.UpdateLayout();
                 HasError(control).Should().BeFalse();
-                SolidColor(Spinner(control).BorderBrush).Should().Be(Resource(window, "TextControlBorderBrush", variant));
+                BorderElement(control).BorderBrush.Should().BeSameAs(ResourceValue(window, "TextControlBorderBrushFocused", variant));
             }
 
             errorColors[0].Should().NotBe(errorColors[1]);
@@ -123,10 +125,26 @@ public sealed class SpinnerThemeTests
         });
     }
 
-    private static Color Resource(Control scope, string key, ThemeVariant variant)
+    /// <summary>
+    /// Gets the border the spinner theme draws. Its states set the brush on this part rather than on the spinner.
+    /// </summary>
+    /// <param name="control">The shown control.</param>
+    /// <returns>The border.</returns>
+    private static Border BorderElement(UserControl control)
+    {
+        return Spinner(control).GetVisualDescendants().OfType<Border>().Single(static border => border.Name == "BorderElement");
+    }
+
+    private static object ResourceValue(Control scope, string key, ThemeVariant variant)
     {
         scope.TryFindResource(key, variant, out var resource).Should().BeTrue($"{key} should resolve for {variant}");
-        return resource is ISolidColorBrush brush ? brush.Color : (Color)resource!;
+        return resource!;
+    }
+
+    private static Color Resource(Control scope, string key, ThemeVariant variant)
+    {
+        var resource = ResourceValue(scope, key, variant);
+        return resource is ISolidColorBrush brush ? brush.Color : (Color)resource;
     }
 
     private static Color SolidColor(IBrush? brush)

@@ -5,6 +5,16 @@
              Focusable="True"
              IsTabStop="False">
     <UserControl.Styles>
+        <!-- Fluent2's 32 px spin buttons leave the editor too narrow for "12:00 PM" or "5000" at the window's
+             minimum width. -->
+        <Style Selector="ButtonSpinner /template/ RepeatButton">
+            <Setter Property="MinWidth" Value="28" />
+        </Style>
+        <!-- The spinner draws the frame and its focus, hover, and error states, so the editor's own border stays
+             hidden instead of drawing a second box inside it. -->
+        <Style Selector="TextBox#ValueTextBox /template/ Border#PART_BorderElement">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
         <Style Selector="ButtonSpinner /template/ RepeatButton#PART_IncreaseButton">
             <Setter Property="AutomationProperties.Name" Value="Increase" />
         </Style>

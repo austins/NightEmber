@@ -17,46 +17,6 @@ namespace NightEmber.Controls;
 /// </remarks>
 public sealed partial class NumericUpDown : UserControl
 {
-    /// <summary>
-    /// Identifies the <see cref="Minimum" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<int> MinimumProperty =
-        AvaloniaProperty.Register<NumericUpDown, int>(nameof(Minimum));
-
-    /// <summary>
-    /// Identifies the <see cref="Maximum" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<int> MaximumProperty =
-        AvaloniaProperty.Register<NumericUpDown, int>(nameof(Maximum), 100);
-
-    /// <summary>
-    /// Identifies the <see cref="Increment" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<int> IncrementProperty =
-        AvaloniaProperty.Register<NumericUpDown, int>(
-            nameof(Increment),
-            1,
-            coerce: static (_, value) => Math.Max(1, value));
-
-    /// <summary>
-    /// Identifies the <see cref="NumericValue" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<int> NumericValueProperty =
-        AvaloniaProperty.Register<NumericUpDown, int>(
-            nameof(NumericValue),
-            defaultBindingMode: BindingMode.TwoWay,
-            coerce: static (element, value) =>
-            {
-                var control = (NumericUpDown)element;
-                return Math.Clamp(value, control.Minimum, control.Maximum);
-            });
-
-    /// <summary>
-    /// Identifies the <see cref="ErrorMessage" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<string> ErrorMessageProperty =
-        AvaloniaProperty.Register<NumericUpDown, string>(nameof(ErrorMessage), string.Empty);
-
     private readonly bool _ready;
     private bool _updatingText;
     private bool _validateEdits;
@@ -80,47 +40,34 @@ public sealed partial class NumericUpDown : UserControl
     /// <summary>
     /// Gets or sets the lowest accepted value.
     /// </summary>
-    public int Minimum
-    {
-        get => GetValue(MinimumProperty);
-        set => SetValue(MinimumProperty, value);
-    }
+    [GeneratedStyledProperty]
+    public partial int Minimum { get; set; }
 
     /// <summary>
     /// Gets or sets the highest accepted value.
     /// </summary>
-    public int Maximum
-    {
-        get => GetValue(MaximumProperty);
-        set => SetValue(MaximumProperty, value);
-    }
+    [GeneratedStyledProperty(DefaultValue = 100)]
+    public partial int Maximum { get; set; }
 
     /// <summary>
     /// Gets or sets the amount applied by the buttons, arrow keys, and mouse wheel.
     /// </summary>
-    public int Increment
-    {
-        get => GetValue(IncrementProperty);
-        set => SetValue(IncrementProperty, value);
-    }
+    /// <remarks>Values below 1 are coerced to 1.</remarks>
+    [GeneratedStyledProperty(DefaultValue = 1, CoerceMethodName = nameof(CoerceIncrement))]
+    public partial int Increment { get; set; }
 
     /// <summary>
     /// Gets or sets the current numeric value.
     /// </summary>
-    public int NumericValue
-    {
-        get => GetValue(NumericValueProperty);
-        set => SetValue(NumericValueProperty, value);
-    }
+    /// <remarks>Binds two-way by default and is clamped to <see cref="Minimum" /> and <see cref="Maximum" />.</remarks>
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay, CoerceMethodName = nameof(CoerceNumericValue))]
+    public partial int NumericValue { get; set; }
 
     /// <summary>
     /// Gets the message explaining the current edit's validation error, or an empty string when valid.
     /// </summary>
-    public string ErrorMessage
-    {
-        get => GetValue(ErrorMessageProperty);
-        private set => SetValue(ErrorMessageProperty, value);
-    }
+    [GeneratedDirectProperty(UnsetValue = "")]
+    public partial string ErrorMessage { get; private set; } = string.Empty;
 
     /// <summary>
     /// Commits an integer within the configured range, preserving invalid text
@@ -179,6 +126,17 @@ public sealed partial class NumericUpDown : UserControl
         {
             EditorAutomation.Forward(change, ValueTextBox);
         }
+    }
+
+    private static int CoerceIncrement(AvaloniaObject sender, int value)
+    {
+        return Math.Max(1, value);
+    }
+
+    private static int CoerceNumericValue(AvaloniaObject sender, int value)
+    {
+        var control = (NumericUpDown)sender;
+        return Math.Clamp(value, control.Minimum, control.Maximum);
     }
 
     private void ChangeValue(int direction)

@@ -43,6 +43,31 @@ public sealed class MainWindowTests
         });
     }
 
+    [Theory]
+    [InlineData("invalid", "invalid")]
+    [InlineData("21:00", "21:00")]
+    public async Task Save_DefaultSizeWithMostErrorsShown_ShowsAllContentWithoutScrolling(string on, string off)
+    {
+        await WithWindow((window, _) =>
+        {
+            // Arrange
+            Find<RadioButton>(window, "CustomModeRadio").IsChecked = true;
+            Input(Find<TimeUpDown>(window, "CustomOnInput")).Text = on;
+            Input(Find<TimeUpDown>(window, "CustomOffInput")).Text = off;
+            Input(Find<NumericUpDown>(window, "FadeDurationInput")).Text = "5001";
+            var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().First();
+
+            // Act
+            Save(window);
+            window.UpdateLayout();
+
+            // Assert
+            Find<TextBlock>(window, "FadeDurationErrorText").IsEffectivelyVisible.Should().BeTrue();
+            Find<StackPanel>(window, "ScheduleErrors").Bounds.Height.Should().BeGreaterThan(0);
+            scroller.Extent.Height.Should().BeLessThanOrEqualTo(scroller.Viewport.Height);
+        });
+    }
+
     [Fact]
     public async Task Tab_CustomSchedule_VisitsEachControlOnceWithOneRadioStopAndCycles()
     {

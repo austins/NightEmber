@@ -20,31 +20,6 @@ namespace NightEmber.Controls;
 /// </remarks>
 public sealed partial class TimeUpDown : UserControl
 {
-    /// <summary>
-    /// Identifies the <see cref="MinuteIncrement" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<int> MinuteIncrementProperty =
-        AvaloniaProperty.Register<TimeUpDown, int>(
-            nameof(MinuteIncrement),
-            5,
-            coerce: static (_, value) => Math.Clamp(value, 1, 59));
-
-    /// <summary>
-    /// Identifies the <see cref="TimeValue" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<TimeSpan> TimeValueProperty =
-        AvaloniaProperty.Register<TimeUpDown, TimeSpan>(
-            nameof(TimeValue),
-            TimeSpan.Zero,
-            defaultBindingMode: BindingMode.TwoWay,
-            coerce: static (_, value) => CoerceTimeValue(value));
-
-    /// <summary>
-    /// Identifies the <see cref="ErrorMessage" /> styled property.
-    /// </summary>
-    public static readonly StyledProperty<string> ErrorMessageProperty =
-        AvaloniaProperty.Register<TimeUpDown, string>(nameof(ErrorMessage), string.Empty);
-
     private readonly bool _ready;
     private TimeSegment _selectedSegment = TimeSegment.Hour;
     private IReadOnlyList<SegmentRange> _segments = [];
@@ -77,29 +52,22 @@ public sealed partial class TimeUpDown : UserControl
     /// <summary>
     /// Gets or sets the number of minutes applied when the minute segment is adjusted.
     /// </summary>
-    public int MinuteIncrement
-    {
-        get => GetValue(MinuteIncrementProperty);
-        set => SetValue(MinuteIncrementProperty, value);
-    }
+    /// <remarks>Values are clamped to 1 through 59.</remarks>
+    [GeneratedStyledProperty(DefaultValue = 5, CoerceMethodName = nameof(CoerceMinuteIncrement))]
+    public partial int MinuteIncrement { get; set; }
 
     /// <summary>
     /// Gets or sets the current time of day.
     /// </summary>
-    public TimeSpan TimeValue
-    {
-        get => GetValue(TimeValueProperty);
-        set => SetValue(TimeValueProperty, value);
-    }
+    /// <remarks>Binds two-way by default and wraps values outside one day into the time of day.</remarks>
+    [GeneratedStyledProperty(DefaultBindingMode = BindingMode.TwoWay, CoerceMethodName = nameof(CoerceTimeValue))]
+    public partial TimeSpan TimeValue { get; set; }
 
     /// <summary>
     /// Gets the message explaining the current edit's validation error, or an empty string when valid.
     /// </summary>
-    public string ErrorMessage
-    {
-        get => GetValue(ErrorMessageProperty);
-        private set => SetValue(ErrorMessageProperty, value);
-    }
+    [GeneratedDirectProperty(UnsetValue = "")]
+    public partial string ErrorMessage { get; private set; } = string.Empty;
 
     /// <summary>
     /// Parses the current text using the user's Windows time format.
@@ -171,7 +139,12 @@ public sealed partial class TimeUpDown : UserControl
         }
     }
 
-    private static TimeSpan CoerceTimeValue(TimeSpan time)
+    private static int CoerceMinuteIncrement(AvaloniaObject sender, int value)
+    {
+        return Math.Clamp(value, 1, 59);
+    }
+
+    private static TimeSpan CoerceTimeValue(AvaloniaObject sender, TimeSpan time)
     {
         var ticks = time.Ticks % TimeSpan.TicksPerDay;
         if (ticks < 0)
